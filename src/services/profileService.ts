@@ -14,8 +14,8 @@ export const incrementGenerationCount = async (): Promise<void> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
     
-    // Define the type for the RPC parameters
-    type IncrementParams = {
+    // Define a proper interface for the RPC parameters to resolve the type issue
+    interface IncrementParams {
       inc_amount: number;
       table_name: string;
       column_name: string;
@@ -23,15 +23,14 @@ export const incrementGenerationCount = async (): Promise<void> => {
       id_column: string;
     }
     
-    // Fix: Simplify the type assertion approach
-    const { error: rpcError } = await supabase.rpc('increment', {
+    // Use a properly typed approach for the RPC call
+    const { error: rpcError } = await supabase.rpc<IncrementParams>('increment', {
       inc_amount: 1,
       table_name: 'profiles',
       column_name: 'generation_count',
       id: session.user.id,
       id_column: 'id'
-    // Use a simpler type assertion approach
-    }) as unknown as { error: any };
+    });
     
     if (rpcError) {
       console.error('Error incrementing generation count via RPC:', rpcError);
