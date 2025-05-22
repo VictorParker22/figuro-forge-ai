@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/Header";
@@ -15,6 +16,7 @@ interface BucketImage {
   url: string;
   id: string;
   created_at: string;
+  fullPath?: string;
 }
 
 const Gallery = () => {
@@ -23,47 +25,74 @@ const Gallery = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  // Recursive function to list files in a folder and its subfolders
+  const listFilesRecursively = async (path: string = ''): Promise<BucketImage[]> => {
+    // List files in the current path
+    const { data: files, error } = await supabase
+      .storage
+      .from('figurine-images')
+      .list(path, {
+        limit: 100,
+        sortBy: { column: 'created_at', order: 'desc' }
+      });
+    
+    if (error) {
+      console.error("Error listing files:", error);
+      return [];
+    }
+    
+    if (!files || files.length === 0) {
+      return [];
+    }
+    
+    // Separate folders and files
+    const folders = files.filter(item => item.id === null);
+    const actualFiles = files.filter(item => item.id !== null);
+    
+    // Process current path's files
+    const processedFiles = await Promise.all(
+      actualFiles.map(async (file) => {
+        const fullPath = path ? `${path}/${file.name}` : file.name;
+        const { data: publicUrlData } = supabase.storage
+          .from('figurine-images')
+          .getPublicUrl(fullPath);
+        
+        return {
+          name: file.name,
+          fullPath: fullPath,
+          url: publicUrlData.publicUrl,
+          id: file.id || fullPath,
+          created_at: file.created_at || new Date().toISOString()
+        };
+      })
+    );
+    
+    // Recursively process subfolders
+    let filesFromSubFolders: BucketImage[] = [];
+    for (const folder of folders) {
+      const subPath = path ? `${path}/${folder.name}` : folder.name;
+      const subFolderFiles = await listFilesRecursively(subPath);
+      filesFromSubFolders = [...filesFromSubFolders, ...subFolderFiles];
+    }
+    
+    // Combine files from current path and subfolders
+    return [...processedFiles, ...filesFromSubFolders];
+  };
+  
   // Load all images from the bucket
   useEffect(() => {
     const fetchImagesFromBucket = async () => {
       setIsLoading(true);
       try {
-        // List all files in the bucket using the provided example
-        const { data: files, error } = await supabase
-          .storage
-          .from('figurine-images')
-          .list(undefined, {
-            limit: 100,
-            sortBy: { column: 'created_at', order: 'desc' }
-          });
+        // Get all files recursively, starting from root
+        const allImages = await listFilesRecursively();
         
-        if (error) {
-          throw error;
-        }
-        
-        if (!files || files.length === 0) {
-          setImages([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        // Get public URLs for all files
-        const imagesWithUrls = await Promise.all(
-          files.map(async (file) => {
-            const { data: publicUrlData } = supabase.storage
-              .from('figurine-images')
-              .getPublicUrl(file.name);
-            
-            return {
-              name: file.name,
-              url: publicUrlData.publicUrl,
-              id: file.id || file.name,
-              created_at: file.created_at || new Date().toISOString()
-            };
-          })
+        // Sort by creation date (newest first)
+        allImages.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         
-        setImages(imagesWithUrls);
+        setImages(allImages);
       } catch (error) {
         console.error("Error loading images from bucket:", error);
         toast({
