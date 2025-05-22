@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -8,10 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download, Upload, Box, Image as ImageIcon, Eye } from "lucide-react";
+import { Download, Upload, Box, Image as ImageIcon, Eye, X } from "lucide-react";
 import UploadModelModal from "@/components/UploadModelModal";
 import ModelViewer from "@/components/model-viewer";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter, DialogClose } from "@/components/ui/dialog";
 
 interface BucketImage {
   name: string;
@@ -21,6 +21,9 @@ interface BucketImage {
   fullPath?: string;
   type: 'image' | '3d-model';  // Add type property to distinguish between images and 3D models
 }
+
+// Maximum number of model viewers that can be open at once
+const MAX_ACTIVE_VIEWERS = 1;
 
 const Gallery = () => {
   const [images, setImages] = useState<BucketImage[]>([]);
@@ -32,6 +35,9 @@ const Gallery = () => {
   const [modelViewerOpen, setModelViewerOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Keep track of active model viewers to limit resource usage
+  const activeViewersRef = useRef<number>(0);
   
   // Helper function to determine file type based on extension
   const getFileType = (filename: string): 'image' | '3d-model' => {
@@ -142,6 +148,14 @@ const Gallery = () => {
     };
   }, [toast]);
   
+  // Clean up WebGL context when component unmounts or when model viewers are closed
+  useEffect(() => {
+    return () => {
+      // Reset active viewers count when component unmounts
+      activeViewersRef.current = 0;
+    };
+  }, []);
+
   const handleNavigateToStudio = () => {
     navigate('/studio');
   };
@@ -159,8 +173,24 @@ const Gallery = () => {
   };
 
   const handleViewModel = (modelUrl: string) => {
+    // Check if we're already at the maximum number of active viewers
+    if (activeViewersRef.current >= MAX_ACTIVE_VIEWERS) {
+      toast({
+        title: "Too many viewers open",
+        description: "Please close the current model viewer before opening another one.",
+        variant: "warning",
+      });
+      return;
+    }
+    
     setViewingModel(modelUrl);
     setModelViewerOpen(true);
+    activeViewersRef.current += 1;
+  };
+  
+  const handleCloseModelViewer = () => {
+    setModelViewerOpen(false);
+    activeViewersRef.current = Math.max(0, activeViewersRef.current - 1);
   };
 
   // Handle model upload from modal
@@ -286,7 +316,10 @@ const Gallery = () => {
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gray-800/50">
-                        <Box size={48} className="text-figuro-accent mb-2" />
+                        <div className="relative w-16 h-16 mb-3">
+                          <Box size={64} className="text-figuro-accent absolute inset-0" />
+                          <div className="absolute inset-0 animate-pulse bg-figuro-accent/20 rounded-md"></div>
+                        </div>
                         <p className="text-center text-sm font-medium truncate max-w-full">
                           {file.name}
                         </p>
@@ -364,14 +397,29 @@ const Gallery = () => {
       />
       
       {/* 3D Model Viewer Dialog */}
-      <Dialog open={modelViewerOpen} onOpenChange={setModelViewerOpen}>
-        <DialogContent className="sm:max-w-[800px] p-0 bg-transparent border-none shadow-none">
+      <Dialog open={modelViewerOpen} onOpenChange={handleCloseModelViewer}>
+        <DialogContent className="sm:max-w-[800px] p-0 bg-gray-900/90 border border-white/10">
+          <DialogHeader className="p-4 border-b border-white/10">
+            <DialogTitle className="flex justify-between items-center">
+              <span>3D Model Viewer</span>
+              <DialogClose asChild>
+                <Button variant="ghost" size="icon" onClick={handleCloseModelViewer} className="h-8 w-8">
+                  <X size={16} />
+                </Button>
+              </DialogClose>
+            </DialogTitle>
+          </DialogHeader>
           {viewingModel && (
             <ModelViewer 
-              modelUrl={viewingModel} 
+              modelUrl={viewingModel}
               isLoading={false}
             />
           )}
+          <DialogFooter className="p-4 border-t border-white/10">
+            <p className="text-xs text-white/50">
+              Note: Only one 3D model can be viewed at a time to ensure optimal performance.
+            </p>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       
