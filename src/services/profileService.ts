@@ -23,14 +23,14 @@ export const incrementGenerationCount = async (): Promise<void> => {
       id_column: string;
     }
     
-    // Fix: Use a generic approach with explicit parameter typing
-    const { error: rpcError } = await supabase.rpc<number>('increment', {
+    // Fix: Use a generic approach with both return type and parameter type
+    const { error: rpcError } = await supabase.rpc<number, IncrementParams>('increment', {
       inc_amount: 1,
       table_name: 'profiles',
       column_name: 'generation_count',
       id: session.user.id,
       id_column: 'id'
-    } as IncrementParams);
+    });
     
     if (rpcError) {
       console.error('Error incrementing generation count via RPC:', rpcError);
