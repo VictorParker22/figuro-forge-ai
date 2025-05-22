@@ -1,26 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download, Upload, Box, Image as ImageIcon, Eye, X } from "lucide-react";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import UploadModelModal from "@/components/UploadModelModal";
-import ModelViewer from "@/components/model-viewer";
-import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter, DialogClose } from "@/components/ui/dialog";
-
-interface BucketImage {
-  name: string;
-  url: string;
-  id: string;
-  created_at: string;
-  fullPath?: string;
-  type: 'image' | '3d-model';  // Add type property to distinguish between images and 3D models
-}
+import { BucketImage } from "@/components/gallery/types";
+import GalleryHeader from "@/components/gallery/GalleryHeader";
+import GalleryGrid from "@/components/gallery/GalleryGrid";
+import ModelViewerDialog from "@/components/gallery/ModelViewerDialog";
+import CallToAction from "@/components/gallery/CallToAction";
 
 // Maximum number of model viewers that can be open at once
 const MAX_ACTIVE_VIEWERS = 1;
@@ -178,7 +167,7 @@ const Gallery = () => {
       toast({
         title: "Too many viewers open",
         description: "Please close the current model viewer before opening another one.",
-        variant: "warning",
+        variant: "default",
       });
       return;
     }
@@ -250,27 +239,7 @@ const Gallery = () => {
       
       <section className="pt-32 pb-20">
         <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-16"
-          >
-            <h1 className="text-3xl md:text-5xl font-bold mb-6 text-gradient">Community Gallery</h1>
-            <p className="text-lg text-white/70 max-w-3xl mx-auto">
-              See figurines and 3D models created by the community. Upload your own 3D models to share!
-            </p>
-            
-            <div className="flex justify-center mt-8">
-              <Button 
-                onClick={() => setUploadModalOpen(true)}
-                className="bg-figuro-accent hover:bg-figuro-accent-hover flex items-center gap-2"
-              >
-                <Box size={18} />
-                Upload 3D Model
-              </Button>
-            </div>
-          </motion.div>
+          <GalleryHeader onUploadClick={() => setUploadModalOpen(true)} />
           
           {customModelUrl && (
             <div className="mb-16">
@@ -284,110 +253,16 @@ const Gallery = () => {
             </div>
           )}
           
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((item) => (
-                <Card key={item} className="glass-panel">
-                  <CardContent className="p-0">
-                    <div className="aspect-square w-full">
-                      <Skeleton className="h-full w-full bg-white/5 loading-shine" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : images.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {images.map((file, index) => (
-                <motion.div 
-                  key={file.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="glass-panel rounded-lg overflow-hidden group"
-                >
-                  <div className="aspect-square relative overflow-hidden bg-white/5">
-                    {file.type === 'image' ? (
-                      <img 
-                        src={`${file.url}?t=${Date.now()}`} 
-                        alt={file.name} 
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gray-800/50">
-                        <div className="relative w-16 h-16 mb-3">
-                          <Box size={64} className="text-figuro-accent absolute inset-0" />
-                          <div className="absolute inset-0 animate-pulse bg-figuro-accent/20 rounded-md"></div>
-                        </div>
-                        <p className="text-center text-sm font-medium truncate max-w-full">
-                          {file.name}
-                        </p>
-                        <p className="text-white/50 text-xs mt-1">3D Model</p>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
-                      <div className="p-4 w-full">
-                        {file.type === 'image' ? (
-                          <Button 
-                            onClick={() => handleDownload(file.url, file.name)}
-                            className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
-                          >
-                            <Download size={16} className="mr-2" /> Download
-                          </Button>
-                        ) : (
-                          <div className="flex flex-col space-y-2 w-full">
-                            <Button 
-                              onClick={() => handleViewModel(file.url)}
-                              className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
-                            >
-                              <Eye size={16} className="mr-2" /> View Model
-                            </Button>
-                            <Button 
-                              onClick={() => handleDownload(file.url, file.name)}
-                              variant="outline"
-                              className="w-full border-white/10"
-                            >
-                              <Download size={16} className="mr-2" /> Download
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <p className="text-white/70 mb-4">No images found in the bucket yet.</p>
-              <p className="text-white/50 mb-8">Be the first to create one!</p>
-            </div>
-          )}
+          <GalleryGrid 
+            images={images}
+            isLoading={isLoading}
+            onDownload={handleDownload}
+            onViewModel={handleViewModel}
+          />
         </div>
       </section>
       
-      <section className="py-16 bg-gradient-to-b from-transparent to-figuro-accent/5">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="text-center"
-          >
-            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-gradient">
-              Ready to create your own figurine?
-            </h2>
-            <Button 
-              className="bg-figuro-accent hover:bg-figuro-accent-hover text-white px-8 py-6 text-lg"
-              onClick={handleNavigateToStudio}
-            >
-              Launch Studio
-            </Button>
-          </motion.div>
-        </div>
-      </section>
+      <CallToAction onNavigateToStudio={handleNavigateToStudio} />
       
       {/* Upload Model Modal */}
       <UploadModelModal 
@@ -397,31 +272,12 @@ const Gallery = () => {
       />
       
       {/* 3D Model Viewer Dialog */}
-      <Dialog open={modelViewerOpen} onOpenChange={handleCloseModelViewer}>
-        <DialogContent className="sm:max-w-[800px] p-0 bg-gray-900/90 border border-white/10">
-          <DialogHeader className="p-4 border-b border-white/10">
-            <DialogTitle className="flex justify-between items-center">
-              <span>3D Model Viewer</span>
-              <DialogClose asChild>
-                <Button variant="ghost" size="icon" onClick={handleCloseModelViewer} className="h-8 w-8">
-                  <X size={16} />
-                </Button>
-              </DialogClose>
-            </DialogTitle>
-          </DialogHeader>
-          {viewingModel && (
-            <ModelViewer 
-              modelUrl={viewingModel}
-              isLoading={false}
-            />
-          )}
-          <DialogFooter className="p-4 border-t border-white/10">
-            <p className="text-xs text-white/50">
-              Note: Only one 3D model can be viewed at a time to ensure optimal performance.
-            </p>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ModelViewerDialog
+        open={modelViewerOpen}
+        onOpenChange={setModelViewerOpen}
+        modelUrl={viewingModel}
+        onClose={handleCloseModelViewer}
+      />
       
       <Footer />
     </div>
