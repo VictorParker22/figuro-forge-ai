@@ -17,6 +17,7 @@ export type Database = {
           is_public: boolean | null
           model_url: string | null
           prompt: string
+          saved_image_url: string | null
           style: Database["public"]["Enums"]["art_style"]
           title: string | null
           updated_at: string | null
@@ -29,6 +30,7 @@ export type Database = {
           is_public?: boolean | null
           model_url?: string | null
           prompt: string
+          saved_image_url?: string | null
           style?: Database["public"]["Enums"]["art_style"]
           title?: string | null
           updated_at?: string | null
@@ -41,6 +43,7 @@ export type Database = {
           is_public?: boolean | null
           model_url?: string | null
           prompt?: string
+          saved_image_url?: string | null
           style?: Database["public"]["Enums"]["art_style"]
           title?: string | null
           updated_at?: string | null
@@ -53,6 +56,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           display_name: string | null
+          generation_count: number | null
           id: string
           updated_at: string | null
         }
@@ -60,6 +64,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
+          generation_count?: number | null
           id: string
           updated_at?: string | null
         }
@@ -67,6 +72,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
+          generation_count?: number | null
           id?: string
           updated_at?: string | null
         }
