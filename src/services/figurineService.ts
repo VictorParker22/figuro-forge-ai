@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { Figurine } from "@/types/figurine";
@@ -42,7 +41,7 @@ export const saveFigurine = async (
       prompt: prompt,
       style: style as any, // Cast to any to bypass the strict enum type check
       image_url: imageUrl,
-      saved_image_url: savedImageUrl,
+      saved_image_url: savedImageUrl || imageUrl, // Fallback to original URL if storage failed
       title: prompt.substring(0, 50),
       is_public: true // Set all figurines as public by default
     };
@@ -79,32 +78,22 @@ export const fetchPublicFigurines = async (): Promise<Figurine[]> => {
       
     if (error) throw error;
     
-    // Map figurines to include direct storage URLs when available
-    const processedFigurines = await Promise.all((data || []).map(async (figurine) => {
-      // If we have a saved_image_url, ensure it's a direct storage URL
-      let imageUrl = figurine.image_url;
+    // Map figurines to include best available image URL
+    const processedFigurines = (data || []).map((figurine) => {
+      // Use saved_image_url if available, otherwise fall back to image_url
+      let imageUrl = figurine.saved_image_url || figurine.image_url;
       
-      if (figurine.saved_image_url) {
-        // Extract the path from the storage URL
-        const urlParts = figurine.saved_image_url.split('/');
-        const bucketName = 'figurine-images';
-        const filePath = urlParts[urlParts.length - 2] + '/' + urlParts[urlParts.length - 1];
-        
-        // Get a signed URL that doesn't expire for 60 minutes
-        const { data: signedUrlData } = await supabase.storage
-          .from(bucketName)
-          .createSignedUrl(filePath, 3600);
-          
-        if (signedUrlData?.signedUrl) {
-          imageUrl = signedUrlData.signedUrl;
-        }
+      // Add a cache-busting parameter to force reloading if it's a storage URL
+      if (imageUrl && imageUrl.includes('supabase.co')) {
+        const cacheBuster = `?t=${Date.now()}`;
+        imageUrl = imageUrl.includes('?') ? `${imageUrl}&cb=${Date.now()}` : `${imageUrl}${cacheBuster}`;
       }
       
       return {
         ...figurine,
         display_url: imageUrl
       };
-    }));
+    });
     
     return processedFigurines;
   } catch (error) {
