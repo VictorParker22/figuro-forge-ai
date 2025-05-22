@@ -3,3 +3,6 @@ project_id = "cwjxbwqdfejhmiixoiym"
 
 [functions.generate-image]
 verify_jwt = false
+
+[functions.convert-to-3d]
+verify_jwt = false

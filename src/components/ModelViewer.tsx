@@ -1,9 +1,15 @@
 
-import { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { 
+  OrbitControls, 
+  PerspectiveCamera, 
+  useGLTF, 
+  Environment,
+  Center
+} from "@react-three/drei";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download } from "lucide-react";
 
@@ -12,6 +18,26 @@ interface ModelViewerProps {
   isLoading: boolean;
 }
 
+// This component will load and display the actual 3D model
+const Model = ({ url }: { url: string }) => {
+  const { scene } = useGLTF(url);
+
+  // Log any errors for debugging
+  useEffect(() => {
+    return () => {
+      // Clean up to avoid memory leaks
+      useGLTF.preload(url);
+    };
+  }, [url]);
+
+  return (
+    <Center scale={[1.5, 1.5, 1.5]}>
+      <primitive object={scene} />
+    </Center>
+  );
+};
+
+// Fallback component shown when no model is available
 const DummyBox = () => (
   <mesh>
     <boxGeometry args={[1, 1, 1]} />
@@ -22,10 +48,33 @@ const DummyBox = () => (
 const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoRotate, setAutoRotate] = useState(true);
+  const [modelError, setModelError] = useState<string | null>(null);
+
+  // Reset error state when modelUrl changes
+  useEffect(() => {
+    setModelError(null);
+  }, [modelUrl]);
 
   if (!modelUrl && !isLoading) {
     return null;
   }
+
+  const handleDownload = () => {
+    if (!modelUrl) return;
+    
+    // Create a temporary anchor element
+    const a = document.createElement('a');
+    a.href = modelUrl;
+    a.download = `figurine-model-${new Date().getTime()}.glb`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleModelError = (error: any) => {
+    console.error("Error loading 3D model:", error);
+    setModelError("Failed to load 3D model. Please try again.");
+  };
 
   return (
     <motion.div
@@ -52,12 +101,28 @@ const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
           <div className="w-full h-full p-4 flex items-center justify-center">
             <Skeleton className="w-full h-full rounded-lg bg-white/5 loading-shine" />
           </div>
+        ) : modelError ? (
+          <div className="w-full h-full p-4 flex items-center justify-center text-center">
+            <div className="text-red-400">
+              <p>{modelError}</p>
+              <p className="text-sm text-white/50 mt-2">Try converting the image again</p>
+            </div>
+          </div>
         ) : (
           <Canvas shadows>
             <ambientLight intensity={0.5} />
             <directionalLight position={[10, 10, 5]} intensity={1} />
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
-            <DummyBox />
+            
+            {modelUrl ? (
+              // Wrap in error boundary
+              <ErrorBoundary fallback={<DummyBox />} onError={handleModelError}>
+                <Model url={modelUrl} />
+              </ErrorBoundary>
+            ) : (
+              <DummyBox />
+            )}
+            
             <OrbitControls 
               autoRotate={autoRotate}
               autoRotateSpeed={2}
@@ -65,6 +130,7 @@ const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
               enableZoom={true}
               enableRotate={true}
             />
+            <Environment preset="sunset" />
           </Canvas>
         )}
       </div>
@@ -73,6 +139,7 @@ const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
         <Button
           className="w-full bg-figuro-accent hover:bg-figuro-accent-hover flex items-center gap-2"
           disabled={!modelUrl || isLoading}
+          onClick={handleDownload}
         >
           <Download size={16} />
           Download 3D Model
@@ -81,5 +148,29 @@ const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
     </motion.div>
   );
 };
+
+// Simple error boundary for the 3D model
+class ErrorBoundary extends React.Component<{
+  children: React.ReactNode;
+  fallback: React.ReactNode;
+  onError: (error: any) => void;
+}> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any) {
+    this.props.onError(error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
 
 export default ModelViewer;

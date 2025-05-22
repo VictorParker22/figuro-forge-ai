@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
+import { supabase } from "@/integrations/supabase/client";
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -92,35 +92,70 @@ export const useImageGeneration = () => {
     }
   };
 
-  // Convert image to 3D model
+  // Convert image to 3D model using Meshy.ai API
   const handleConvertTo3D = async () => {
+    if (!generatedImage) {
+      toast({
+        title: "No image to convert",
+        description: "Please generate an image first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsConverting(true);
     
     try {
-      // Simulate API call with timeout
-      setTimeout(async () => {
-        // In a real app, this would call another API or model
-        const dummyModelUrl = "dummy-model-url";
-        setModelUrl(dummyModelUrl);
-        
-        // Update figurine with model URL if we have one
-        if (currentFigurineId) {
-          await updateFigurineWithModelUrl(currentFigurineId, dummyModelUrl);
+      // Call our Supabase Edge Function to convert the image to 3D
+      const response = await fetch(`${window.location.origin}/functions/v1/convert-to-3d`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          imageUrl: generatedImage 
+        }),
+      });
+      
+      if (!response.ok) {
+        let errorMessage = "Failed to convert image to 3D model";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.details || errorMessage;
+        } catch (e) {
+          // If we can't parse the error as JSON, use the status text
+          errorMessage = `Error: ${response.status} ${response.statusText}`;
         }
-        
-        setIsConverting(false);
-        toast({
-          title: "3D model created",
-          description: "Your figurine is ready to view in 3D",
-        });
-      }, 3000);
+        throw new Error(errorMessage);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.modelUrl) {
+        throw new Error("No model URL returned from conversion service");
+      }
+      
+      // Set the model URL in state
+      setModelUrl(data.modelUrl);
+      
+      // Update figurine with model URL if we have one
+      if (currentFigurineId) {
+        await updateFigurineWithModelUrl(currentFigurineId, data.modelUrl);
+      }
+      
+      toast({
+        title: "3D model created",
+        description: "Your figurine is ready to view in 3D",
+      });
     } catch (error) {
-      setIsConverting(false);
+      console.error("Conversion error:", error);
       toast({
         title: "Conversion failed",
         description: error instanceof Error ? error.message : "Failed to convert to 3D model",
         variant: "destructive",
       });
+    } finally {
+      setIsConverting(false);
     }
   };
 
