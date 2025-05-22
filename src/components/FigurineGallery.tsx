@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
@@ -6,17 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Eye, Download } from 'lucide-react';
-
-interface Figurine {
-  id: string;
-  title: string;
-  prompt: string;
-  style: string;
-  image_url: string;
-  saved_image_url: string | null;
-  model_url: string | null;
-  created_at: string;
-}
+import { Figurine } from '@/types/figurine';
 
 const FigurineGallery = () => {
   const [figurines, setFigurines] = useState<Figurine[]>([]);
@@ -43,7 +32,7 @@ const FigurineGallery = () => {
           
         if (error) throw error;
         
-        // Make sure all required properties exist in the data and specifically add saved_image_url if it's missing
+        // Make sure all required properties exist in the data
         const processedData = (data || []).map(figurine => ({
           id: figurine.id,
           title: figurine.title || "",
@@ -52,7 +41,9 @@ const FigurineGallery = () => {
           image_url: figurine.image_url || "",
           saved_image_url: figurine.saved_image_url || null,
           model_url: figurine.model_url || null,
-          created_at: figurine.created_at || new Date().toISOString()
+          created_at: figurine.created_at || new Date().toISOString(),
+          user_id: figurine.user_id,
+          is_public: figurine.is_public
         }));
         
         setFigurines(processedData);

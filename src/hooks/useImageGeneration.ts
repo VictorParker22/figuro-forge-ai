@@ -1,20 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { formatStylePrompt } from "@/lib/huggingface";
-import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from 'uuid';
-
-// Define a more flexible profiles type
-interface Profile {
-  id: string;
-  avatar_url?: string | null;
-  created_at?: string | null;
-  display_name?: string | null;
-  updated_at?: string | null;
-  generation_count?: number | null;
-  [key: string]: any; // Allow for additional properties
-}
+import { getRemainingGenerations, incrementGenerationCount } from "@/services/profileService";
+import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
+import { generateImage } from "@/services/generationService";
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -29,81 +17,12 @@ export const useImageGeneration = () => {
   // Check for remaining generations when user authenticates
   useEffect(() => {
     const checkRemainingGenerations = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        try {
-          // First check if the generation_count column exists
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (profileError) {
-            console.error('Error fetching profile:', profileError);
-            return;
-          }
-          
-          // Cast profileData to our more flexible Profile type
-          const profile = profileData as Profile;
-          
-          // Check if generation_count exists and is a number
-          const generationCount = profile && typeof profile.generation_count === 'number' 
-            ? profile.generation_count 
-            : 0;
-          
-          // Users are allowed 4 generations
-          setGenerationsLeft(Math.max(0, 4 - generationCount));
-        } catch (err) {
-          console.error('Error checking generations:', err);
-          // Default to allowing generations if we can't check
-          setGenerationsLeft(4);
-        }
-      }
+      const remainingGenerations = await getRemainingGenerations();
+      setGenerationsLeft(remainingGenerations);
     };
 
     checkRemainingGenerations();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkRemainingGenerations();
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
-
-  // Save image to storage and update figurine record
-  const saveImageToStorage = async (imageBlob: Blob, figurineId: string): Promise<string | null> => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return null;
-      
-      const filePath = `${session.user.id}/${figurineId}.png`;
-      
-      // Upload image to storage
-      const { data, error } = await supabase.storage
-        .from('figurine-images')
-        .upload(filePath, imageBlob, {
-          contentType: 'image/png',
-          upsert: true
-        });
-      
-      if (error) {
-        console.error('Storage upload error:', error);
-        return null;
-      }
-      
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('figurine-images')
-        .getPublicUrl(filePath);
-        
-      return publicUrlData.publicUrl;
-    } catch (error) {
-      console.error('Failed to save image to storage:', error);
-      return null;
-    }
-  };
 
   // Generate image using the Edge Function or directly
   const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string) => {
@@ -137,128 +56,48 @@ export const useImageGeneration = () => {
         imageBlob = await response.blob();
       } else {
         // Otherwise call the edge function
-        const response = await fetch(`${window.location.origin}/functions/v1/generate-image`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`
-          },
-          body: JSON.stringify({ 
-            prompt,
-            style,
-            apiKey: savedApiKey
-          }),
-        });
+        const result = await generateImage(prompt, style, savedApiKey);
         
-        // Handle authentication errors
-        if (response.status === 401) {
-          setRequiresApiKey(true);
-          throw new Error("API key required or unauthorized access");
-        }
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `API error: ${response.statusText}`);
+        if (result.error) {
+          // Check if the error is about API key
+          if (result.error.includes("API key") || result.error.includes("unauthorized")) {
+            setRequiresApiKey(true);
+            return { success: false, needsApiKey: true };
+          }
+          
+          throw new Error(result.error);
         }
         
         // We don't need an API key anymore if we got a successful response
         setRequiresApiKey(false);
         
-        // Process the response - if it's JSON with an error, handle it
-        const contentType = response.headers.get("Content-Type") || "";
-        if (contentType.includes("application/json")) {
-          const errorData = await response.json();
-          if (!errorData.success) {
-            throw new Error(errorData.error || "Failed to generate image");
-          }
+        imageBlob = result.blob;
+        imageUrl = result.url;
+        if (imageUrl) {
+          setGeneratedImage(imageUrl);
         }
-        
-        // Otherwise, it's an image, so create a blob
-        imageBlob = await response.blob();
-        imageUrl = URL.createObjectURL(imageBlob);
-        setGeneratedImage(imageUrl);
       }
       
-      // Save the figurine to Supabase if user is authenticated
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // Generate a new ID for the figurine
-        const figurineId = uuidv4();
-        setCurrentFigurineId(figurineId);
+      // Save the figurine to Supabase if we have an image
+      if (imageUrl) {
+        const figurineId = await saveFigurine(prompt, style, imageUrl, imageBlob);
         
-        // Save image to storage if we have a blob
-        let savedImageUrl = null;
-        if (imageBlob) {
-          savedImageUrl = await saveImageToStorage(imageBlob, figurineId);
-        }
-        
-        // Insert new figurine
-        await supabase.from('figurines').insert({
-          id: figurineId,
-          user_id: session.user.id,
-          prompt: prompt,
-          style: style as any,
-          image_url: imageUrl,
-          saved_image_url: savedImageUrl,
-          title: prompt.substring(0, 50)
-        });
-        
-        try {
-          // Update generation count using the RPC function directly
-          const { error: rpcError } = await supabase.rpc('increment', {
-            inc_amount: 1,
-            table_name: 'profiles',
-            column_name: 'generation_count',
-            id: session.user.id,
-            id_column: 'id'
-          });
+        if (figurineId) {
+          setCurrentFigurineId(figurineId);
           
-          if (rpcError) {
-            console.error('Error incrementing generation count via RPC:', rpcError);
-            
-            // Fallback: Use direct update if RPC fails
-            // Get current profile data first to avoid type issues
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-              
-            if (profileData) {
-              // Cast to our flexible Profile type
-              const profile = profileData as Profile;
-              
-              // Only try to update if we have valid data
-              const currentCount = typeof profile.generation_count === 'number' ? profile.generation_count : 0;
-              
-              // Use a safe update approach
-              await supabase
-                .from('profiles')
-                .update({ 
-                  generation_count: currentCount + 1 
-                })
-                .eq('id', session.user.id);
-            }
-          }
+          // Update the generation count
+          await incrementGenerationCount();
           
           // Update generations left
           if (generationsLeft !== null) {
             setGenerationsLeft(Math.max(0, generationsLeft - 1));
           }
-        } catch (error) {
-          console.error('Error updating generation count:', error);
         }
       }
       
       return { success: true, needsApiKey: false };
     } catch (error) {
       console.error("Generation error:", error);
-      
-      // Check if the error is about API key
-      if (error instanceof Error && (error.message.includes("API key") || error.message.includes("unauthorized"))) {
-        setRequiresApiKey(true);
-        return { success: false, needsApiKey: true };
-      }
       
       toast({
         title: "Generation failed",
@@ -285,12 +124,7 @@ export const useImageGeneration = () => {
         
         // Update figurine with model URL if we have one
         if (currentFigurineId) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user) {
-            await supabase.from('figurines').update({
-              model_url: dummyModelUrl
-            }).eq('id', currentFigurineId);
-          }
+          await updateFigurineWithModelUrl(currentFigurineId, dummyModelUrl);
         }
         
         setIsConverting(false);
