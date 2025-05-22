@@ -23,8 +23,9 @@ export const incrementGenerationCount = async (): Promise<void> => {
       id_column: string;
     }
     
-    // Use a properly typed approach for the RPC call
-    const { error: rpcError } = await supabase.rpc<IncrementParams>('increment', {
+    // Use a properly typed approach for the RPC call with both type arguments
+    // First argument is for the response type, second is for the params type
+    const { error: rpcError } = await supabase.rpc<number, IncrementParams>('increment', {
       inc_amount: 1,
       table_name: 'profiles',
       column_name: 'generation_count',
