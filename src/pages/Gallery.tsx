@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/Header";
@@ -9,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download, Upload, Box, Image as ImageIcon } from "lucide-react";
+import { Download, Upload, Box, Image as ImageIcon, Eye } from "lucide-react";
 import UploadModelModal from "@/components/UploadModelModal";
 import ModelViewer from "@/components/model-viewer";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
