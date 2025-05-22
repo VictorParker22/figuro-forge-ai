@@ -53,7 +53,7 @@ const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
             <Skeleton className="w-full h-full rounded-lg bg-white/5 loading-shine" />
           </div>
         ) : (
-          <Canvas shadows dpr={[1, 2]}>
+          <Canvas shadows>
             <ambientLight intensity={0.5} />
             <directionalLight position={[10, 10, 5]} intensity={1} />
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
