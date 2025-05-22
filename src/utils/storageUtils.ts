@@ -76,7 +76,7 @@ export const saveImageToStorage = async (imageBlob: Blob, figurineId: string): P
     if (error) {
       console.error('Storage upload error:', error);
       // If error is due to permissions, try uploading to a public folder
-      if (error.message?.includes('policy') || error.status === 400) {
+      if (error.message?.includes('policy') || error.message?.includes('permission')) {
         console.log('Trying alternative public upload path due to permission issues');
         const publicFilePath = `public/${figurineId}.png`;
         
