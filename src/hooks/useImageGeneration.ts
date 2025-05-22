@@ -1,7 +1,9 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { formatStylePrompt } from "@/lib/huggingface";
+import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -9,6 +11,7 @@ export const useImageGeneration = () => {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [requiresApiKey, setRequiresApiKey] = useState(false);
+  const [currentFigurineId, setCurrentFigurineId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Generate image using the Hugging Face API
@@ -18,6 +21,7 @@ export const useImageGeneration = () => {
     setIsGeneratingImage(true);
     setGeneratedImage(null);
     setModelUrl(null);
+    setCurrentFigurineId(null);
     
     const formattedPrompt = formatStylePrompt(prompt, style);
     
@@ -61,6 +65,24 @@ export const useImageGeneration = () => {
       const imageUrl = URL.createObjectURL(blob);
       setGeneratedImage(imageUrl);
       
+      // Save the figurine to Supabase if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // We'll need to upload the image to storage in a real app
+        // For now, just save the reference
+        const figurineId = uuidv4();
+        setCurrentFigurineId(figurineId);
+        
+        await supabase.from('figurines').insert({
+          id: figurineId,
+          user_id: session.user.id,
+          prompt: prompt,
+          style: style as any, // Match the enum type
+          image_url: imageUrl, // In real app, upload to Supabase Storage
+          title: prompt.substring(0, 50) // Use part of the prompt as title
+        });
+      }
+      
       toast({
         title: "Image generated",
         description: `Created "${prompt}" in ${style} style`,
@@ -88,20 +110,41 @@ export const useImageGeneration = () => {
     }
   };
 
-  // Simulate 3D conversion
-  const handleConvertTo3D = () => {
+  // Convert image to 3D model
+  const handleConvertTo3D = async () => {
     setIsConverting(true);
     
-    // Simulate API call with timeout
-    setTimeout(() => {
-      // In a real app, this would call another API or model
-      setModelUrl("dummy-model-url");
+    try {
+      // Simulate API call with timeout
+      setTimeout(async () => {
+        // In a real app, this would call another API or model
+        const dummyModelUrl = "dummy-model-url";
+        setModelUrl(dummyModelUrl);
+        
+        // Update figurine with model URL if we have one
+        if (currentFigurineId) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            await supabase.from('figurines').update({
+              model_url: dummyModelUrl
+            }).eq('id', currentFigurineId);
+          }
+        }
+        
+        setIsConverting(false);
+        toast({
+          title: "3D model created",
+          description: "Your figurine is ready to view in 3D",
+        });
+      }, 3000);
+    } catch (error) {
       setIsConverting(false);
       toast({
-        title: "3D model created",
-        description: "Your figurine is ready to view in 3D",
+        title: "Conversion failed",
+        description: error instanceof Error ? error.message : "Failed to convert to 3D model",
+        variant: "destructive",
       });
-    }, 3000);
+    }
   };
 
   return {
@@ -111,6 +154,7 @@ export const useImageGeneration = () => {
     modelUrl,
     handleGenerate,
     handleConvertTo3D,
-    requiresApiKey
+    requiresApiKey,
+    currentFigurineId
   };
 };

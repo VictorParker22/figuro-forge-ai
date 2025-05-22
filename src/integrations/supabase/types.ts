@@ -9,7 +9,69 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      figurines: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_url: string | null
+          is_public: boolean | null
+          model_url: string | null
+          prompt: string
+          style: Database["public"]["Enums"]["art_style"]
+          title: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_public?: boolean | null
+          model_url?: string | null
+          prompt: string
+          style?: Database["public"]["Enums"]["art_style"]
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_public?: boolean | null
+          model_url?: string | null
+          prompt?: string
+          style?: Database["public"]["Enums"]["art_style"]
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +80,15 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      art_style:
+        | "isometric"
+        | "anime"
+        | "pixar"
+        | "steampunk"
+        | "lowpoly"
+        | "cyberpunk"
+        | "realistic"
+        | "chibi"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +203,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      art_style: [
+        "isometric",
+        "anime",
+        "pixar",
+        "steampunk",
+        "lowpoly",
+        "cyberpunk",
+        "realistic",
+        "chibi",
+      ],
+    },
   },
 } as const

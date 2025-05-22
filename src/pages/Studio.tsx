@@ -10,10 +10,13 @@ import StudioHeader from "@/components/StudioHeader";
 import { useImageGeneration } from "@/hooks/useImageGeneration";
 import { generateImageWithEdge } from "@/lib/edgeFunction";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 const Studio = () => {
   const [apiKey, setApiKey] = useState<string | "">("");
   const [showApiInput, setShowApiInput] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const { toast } = useToast();
   
   const {
@@ -25,6 +28,25 @@ const Studio = () => {
     handleConvertTo3D,
     requiresApiKey
   } = useImageGeneration();
+
+  // Check for authenticated user
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user || null);
+      
+      // Set up auth state change listener
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          setUser(session?.user || null);
+        }
+      );
+      
+      return () => subscription.unsubscribe();
+    };
+    
+    checkUser();
+  }, []);
 
   useEffect(() => {
     // Check if API key is stored in localStorage
@@ -73,6 +95,24 @@ const Studio = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    toast({
+      title: "Signed out",
+      description: "You have been signed out successfully",
+    });
+  };
+
+  const handleSignIn = () => {
+    // In a real app, redirect to the login page
+    toast({
+      title: "Authentication required",
+      description: "Please sign in to save your figurines",
+    });
+    // For now, we'll just show a toast
+    // window.location.href = "/login";
+  };
+
   return (
     <div className="min-h-screen bg-figuro-dark">
       <Header />
@@ -80,6 +120,21 @@ const Studio = () => {
       <section className="pt-32 pb-24">
         <div className="container mx-auto px-4">
           <StudioHeader />
+          
+          <div className="mb-8 flex justify-end">
+            {user ? (
+              <div className="flex items-center gap-4">
+                <span className="text-white">Welcome, {user.email}</span>
+                <Button onClick={handleSignOut} variant="outline" className="border-white/10">
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <Button onClick={handleSignIn} variant="outline" className="border-white/10">
+                Sign In to Save
+              </Button>
+            )}
+          </div>
           
           {showApiInput && (
             <ApiKeyInput 
