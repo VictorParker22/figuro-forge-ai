@@ -3,12 +3,18 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Hero = () => {
+  const navigate = useNavigate();
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    navigate('/studio');
+  };
+  
   return (
     <section className="pt-32 pb-20 relative overflow-hidden min-h-screen flex items-center justify-center">
-      {/* Remove the previous background elements since we're using VANTA now */}
-      
       <motion.div 
         className="container mx-auto px-4 relative z-10 text-center"
         initial={{ opacity: 0 }}
@@ -40,15 +46,17 @@ const Hero = () => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.8 }}
           >
-            <div className="flex rounded-md overflow-hidden bg-white/5 border border-white/10 focus-within:border-white/20">
-              <Input 
-                placeholder="Describe your figurine idea..."
-                className="bg-transparent border-0 ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-white/90 flex-1"
-              />
-              <Button className="bg-figuro-accent hover:bg-figuro-accent-hover rounded-none px-4">
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="flex rounded-md overflow-hidden bg-white/5 border border-white/10 focus-within:border-white/20">
+                <Input 
+                  placeholder="Describe your figurine idea..."
+                  className="bg-transparent border-0 ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-white/90 flex-1"
+                />
+                <Button type="submit" className="bg-figuro-accent hover:bg-figuro-accent-hover rounded-none px-4">
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              </div>
+            </form>
             <p className="text-white/50 text-sm mt-3">
               Start creating custom figurines in seconds. No credit card required.
             </p>

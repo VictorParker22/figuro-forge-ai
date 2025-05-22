@@ -45,11 +45,14 @@ const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
           </label>
           <Input
             id="prompt"
-            placeholder="e.g. Cyberpunk cat with laser sword, chibi style"
+            placeholder="e.g. Cyberpunk cat with laser sword"
             className="bg-white/5 border-white/10 text-white focus:border-figuro-accent"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
+          <p className="text-xs text-white/50">
+            Describe the subject you want for your figurine. The style settings below will be applied automatically.
+          </p>
         </div>
         
         <div className="space-y-2">
