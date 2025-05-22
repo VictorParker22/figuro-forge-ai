@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download, Upload, Cube } from "lucide-react";
+import { Download, Upload, Box } from "lucide-react";
 import UploadModelModal from "@/components/UploadModelModal";
 import ModelViewer from "@/components/model-viewer";
 
@@ -218,7 +218,7 @@ const Gallery = () => {
                 onClick={() => setUploadModalOpen(true)}
                 className="bg-figuro-accent hover:bg-figuro-accent-hover flex items-center gap-2"
               >
-                <Cube size={18} />
+                <Box size={18} />
                 Upload 3D Model
               </Button>
             </div>
