@@ -8,15 +8,12 @@ export const useImageGeneration = () => {
   const [isConverting, setIsConverting] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
+  const [requiresApiKey, setRequiresApiKey] = useState(false);
   const { toast } = useToast();
 
   // Generate image using the Hugging Face API
-  const handleGenerate = async (prompt: string, style: string, apiKey: string) => {
+  const handleGenerate = async (prompt: string, style: string, apiKey: string = "") => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
-    
-    if (!savedApiKey) {
-      return { needsApiKey: true };
-    }
     
     setIsGeneratingImage(true);
     setGeneratedImage(null);
@@ -25,15 +22,19 @@ export const useImageGeneration = () => {
     const formattedPrompt = formatStylePrompt(prompt, style);
     
     try {
-      // This is where you'd normally call a Supabase Edge Function
-      // For now, we'll simulate with a direct API call
-      // In production, move this to a secure Edge Function
+      // Try without API key first if none is provided
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      
+      // Add API key to headers if available
+      if (savedApiKey) {
+        headers["Authorization"] = `Bearer ${savedApiKey}`;
+      }
+      
       const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${savedApiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ 
           inputs: formattedPrompt,
           options: {
@@ -43,9 +44,17 @@ export const useImageGeneration = () => {
         }),
       });
       
+      if (response.status === 401 || response.status === 403) {
+        setRequiresApiKey(true);
+        throw new Error("API key required or unauthorized access");
+      }
+      
       if (!response.ok) {
         throw new Error(`API error: ${response.statusText}`);
       }
+      
+      // If we get here, we don't need an API key anymore
+      setRequiresApiKey(false);
       
       // Convert the response to a blob and create a URL
       const blob = await response.blob();
@@ -60,13 +69,20 @@ export const useImageGeneration = () => {
       return { success: true, needsApiKey: false };
     } catch (error) {
       console.error("Generation error:", error);
+      
+      // Check if the error is about API key
+      if (error instanceof Error && (error.message.includes("API key") || error.message.includes("unauthorized"))) {
+        setRequiresApiKey(true);
+        return { success: false, needsApiKey: true };
+      }
+      
       toast({
         title: "Generation failed",
         description: error instanceof Error ? error.message : "Failed to generate image",
         variant: "destructive",
       });
       
-      return { success: false, needsApiKey: false };
+      return { success: false, needsApiKey: requiresApiKey };
     } finally {
       setIsGeneratingImage(false);
     }
@@ -94,6 +110,7 @@ export const useImageGeneration = () => {
     generatedImage,
     modelUrl,
     handleGenerate,
-    handleConvertTo3D
+    handleConvertTo3D,
+    requiresApiKey
   };
 };

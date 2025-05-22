@@ -11,13 +11,19 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
   // Determine if we should use a specific LoRA adapter
   const useLoraAdapter = style === "isometric" ? "multimodalart/isometric-skeumorphic-3d-bnb" : undefined;
   
+  // Create headers with or without API key
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+  
   // Make the API request
   const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({ 
       inputs: formattedPrompt,
       options: {
@@ -45,7 +51,7 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
 export const formatStylePrompt = (basePrompt: string, style: string): string => {
   switch (style) {
     case "isometric":
-      return `${basePrompt}, RBNBICN, icon, white background, isometric perspective`;
+      return `${basePrompt}, RBNBICN, icon, white background, isometric perspective, 3D-like, clean lines, detailed, professional design, high quality`;
     case "anime":
       return `${basePrompt}, anime style, vibrant colors, white background`;
     case "pixar":

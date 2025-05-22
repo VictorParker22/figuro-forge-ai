@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Download } from "lucide-react";
 
 interface ImagePreviewProps {
   imageSrc: string | null;
@@ -14,6 +15,18 @@ const ImagePreview = ({ imageSrc, isLoading, onConvertTo3D, isConverting }: Imag
   if (!imageSrc && !isLoading) {
     return null;
   }
+  
+  const handleSaveImage = () => {
+    if (!imageSrc) return;
+    
+    // Create a temporary anchor element
+    const a = document.createElement('a');
+    a.href = imageSrc;
+    a.download = `figurine-${new Date().getTime()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   return (
     <motion.div
@@ -22,8 +35,19 @@ const ImagePreview = ({ imageSrc, isLoading, onConvertTo3D, isConverting }: Imag
       transition={{ duration: 0.5 }}
       className="glass-panel rounded-xl overflow-hidden"
     >
-      <div className="p-4 border-b border-white/10">
+      <div className="p-4 border-b border-white/10 flex justify-between items-center">
         <h3 className="text-lg font-medium">Generated Image</h3>
+        {imageSrc && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="border-white/10 hover:border-white/30"
+            onClick={handleSaveImage}
+          >
+            <Download size={16} className="mr-1" />
+            Save
+          </Button>
+        )}
       </div>
       
       <div className="relative aspect-square">

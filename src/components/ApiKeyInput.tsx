@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Key } from "lucide-react";
 
 interface ApiKeyInputProps {
   apiKey: string;
@@ -32,6 +33,11 @@ const ApiKeyInput = ({ apiKey, setApiKey, onSubmit }: ApiKeyInputProps) => {
       animate={{ opacity: 1, y: 0 }}
       className="glass-panel p-6 rounded-xl max-w-md mx-auto mb-8"
     >
+      <div className="flex items-center gap-2 mb-4 text-figuro-accent">
+        <Key size={18} />
+        <h3 className="font-semibold">API Key Required</h3>
+      </div>
+      
       <form onSubmit={handleApiKeySubmit} className="space-y-4">
         <div className="space-y-2">
           <label htmlFor="apiKey" className="text-sm text-white/70">
@@ -46,9 +52,9 @@ const ApiKeyInput = ({ apiKey, setApiKey, onSubmit }: ApiKeyInputProps) => {
             onChange={(e) => setApiKey(e.target.value)}
           />
           <p className="text-xs text-white/50">
-            Your API key is only stored temporarily in your browser's local storage.
+            The API requires authentication for higher usage limits.
             <br />
-            In production, this should be handled through a Supabase Edge Function.
+            Your API key is only stored temporarily in your browser's local storage.
           </p>
         </div>
         <Button

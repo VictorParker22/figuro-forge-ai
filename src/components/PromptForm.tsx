@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import ExamplePrompts from "@/components/ExamplePrompts";
 
 const ART_STYLES = [
   { id: "isometric", name: "Isometric Skeuomorphic" },
@@ -31,57 +32,67 @@ const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
     onGenerate(prompt, style);
   };
 
+  const handleExampleSelect = (examplePrompt: string) => {
+    setPrompt(examplePrompt);
+    // Optionally auto-submit the form with the example
+    // onGenerate(examplePrompt, style);
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="glass-panel p-6 rounded-xl"
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="prompt" className="text-sm text-white/70">
-            Describe your figurine
-          </label>
-          <Input
-            id="prompt"
-            placeholder="e.g. Cyberpunk cat with laser sword"
-            className="bg-white/5 border-white/10 text-white focus:border-figuro-accent"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-          <p className="text-xs text-white/50">
-            Describe the subject you want for your figurine. The style settings below will be applied automatically.
-          </p>
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="style" className="text-sm text-white/70">
-            Art Style
-          </label>
-          <Select value={style} onValueChange={setStyle}>
-            <SelectTrigger className="bg-white/5 border-white/10 text-white">
-              <SelectValue placeholder="Select style" />
-            </SelectTrigger>
-            <SelectContent className="bg-figuro-darker border-white/10">
-              {ART_STYLES.map((artStyle) => (
-                <SelectItem key={artStyle.id} value={artStyle.id} className="focus:bg-figuro-accent/20">
-                  {artStyle.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <Button
-          type="submit"
-          className={`w-full bg-figuro-accent hover:bg-figuro-accent-hover ${isGenerating ? 'animate-pulse' : ''}`}
-          disabled={isGenerating || !prompt.trim()}
-        >
-          {isGenerating ? "Generating..." : "Generate Figurine"}
-        </Button>
-      </form>
-    </motion.div>
+    <div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="glass-panel p-6 rounded-xl"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="prompt" className="text-sm text-white/70">
+              Describe your figurine
+            </label>
+            <Input
+              id="prompt"
+              placeholder="e.g. Cyberpunk cat with laser sword"
+              className="bg-white/5 border-white/10 text-white focus:border-figuro-accent"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+            <p className="text-xs text-white/50">
+              Describe the subject you want for your figurine. The style settings below will be applied automatically.
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="style" className="text-sm text-white/70">
+              Art Style
+            </label>
+            <Select value={style} onValueChange={setStyle}>
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder="Select style" />
+              </SelectTrigger>
+              <SelectContent className="bg-figuro-darker border-white/10">
+                {ART_STYLES.map((artStyle) => (
+                  <SelectItem key={artStyle.id} value={artStyle.id} className="focus:bg-figuro-accent/20">
+                    {artStyle.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <Button
+            type="submit"
+            className={`w-full bg-figuro-accent hover:bg-figuro-accent-hover ${isGenerating ? 'animate-pulse' : ''}`}
+            disabled={isGenerating || !prompt.trim()}
+          >
+            {isGenerating ? "Generating..." : "Generate Figurine"}
+          </Button>
+        </form>
+      </motion.div>
+      
+      {style === "isometric" && <ExamplePrompts onSelectPrompt={handleExampleSelect} />}
+    </div>
   );
 };
 

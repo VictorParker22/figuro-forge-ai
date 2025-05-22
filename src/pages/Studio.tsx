@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
 import ImagePreview from "@/components/ImagePreview";
@@ -19,8 +19,22 @@ const Studio = () => {
     generatedImage,
     modelUrl,
     handleGenerate,
-    handleConvertTo3D
+    handleConvertTo3D,
+    requiresApiKey
   } = useImageGeneration();
+
+  useEffect(() => {
+    // Check if API key is stored in localStorage
+    const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey");
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Show API input if requiresApiKey is true
+    setShowApiInput(requiresApiKey);
+  }, [requiresApiKey]);
 
   // Wrapper for generate function to handle API key checking
   const onGenerate = async (prompt: string, style: string) => {
