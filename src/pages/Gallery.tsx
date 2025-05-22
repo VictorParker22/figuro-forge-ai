@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/Header";
@@ -29,23 +28,9 @@ const Gallery = () => {
     const fetchImagesFromBucket = async () => {
       setIsLoading(true);
       try {
-        // Try to ensure the bucket exists first
-        try {
-          const { data: buckets } = await supabase.storage.listBuckets();
-          const bucketExists = buckets?.some(bucket => bucket.name === 'figurine-images');
-          
-          if (!bucketExists) {
-            console.log('Bucket does not exist or not accessible');
-            setIsLoading(false);
-            return;
-          }
-        } catch (error) {
-          console.warn('Error checking bucket:', error);
-          // Continue anyway as the bucket might exist but not be visible
-        }
-        
-        // List all files in the bucket
-        const { data: files, error } = await supabase.storage
+        // List all files in the bucket using the provided example
+        const { data: files, error } = await supabase
+          .storage
           .from('figurine-images')
           .list(undefined, {
             limit: 100,
