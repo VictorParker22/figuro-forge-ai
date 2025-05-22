@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Eye, Download, CubeIcon } from 'lucide-react';
+import { Eye, Download, Cube } from 'lucide-react';
 import { Figurine } from '@/types/figurine';
 import ModelViewer from '@/components/model-viewer';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -139,7 +138,7 @@ const FigurineGallery = () => {
                   {figurine.title}
                   {figurine.model_url && (
                     <span className="ml-2 inline-flex items-center text-figuro-accent">
-                      <CubeIcon size={14} />
+                      <Cube size={14} />
                     </span>
                   )}
                 </CardTitle>

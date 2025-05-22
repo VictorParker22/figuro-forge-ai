@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download, Upload, CubeIcon } from "lucide-react";
+import { Download, Upload, Cube } from "lucide-react";
 import UploadModelModal from "@/components/UploadModelModal";
 import ModelViewer from "@/components/model-viewer";
 
@@ -174,6 +174,14 @@ const Gallery = () => {
         });
         
         // Refresh the gallery
+        const fetchImagesFromBucket = async () => {
+          const allImages = await listFilesRecursively();
+          allImages.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          setImages(allImages);
+        };
+        
         fetchImagesFromBucket();
       } catch (error) {
         console.error('Error uploading model:', error);
@@ -210,7 +218,7 @@ const Gallery = () => {
                 onClick={() => setUploadModalOpen(true)}
                 className="bg-figuro-accent hover:bg-figuro-accent-hover flex items-center gap-2"
               >
-                <CubeIcon size={18} />
+                <Cube size={18} />
                 Upload 3D Model
               </Button>
             </div>
