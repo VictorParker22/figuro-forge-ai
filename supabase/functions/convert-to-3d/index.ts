@@ -48,91 +48,53 @@ serve(async (req: Request) => {
       )
     }
 
-    console.log("Creating 3D conversion task...")
+    console.log("Creating 3D conversion request...")
     
-    // Prepare the request body based on what we received
-    const requestBody: any = {
+    // Prepare the request payload
+    const requestPayload: any = {
       outputFormat: 'glb',
+      enable_pbr: true,
+      should_remesh: true,
+      should_texture: true,
       background: 'remove'
     }
     
     // Add either the URL or the base64 data
     if (imageBase64) {
-      requestBody.imageBase64 = imageBase64
+      // Handle base64 data URI
+      requestPayload.image_url = imageBase64.startsWith('data:') 
+        ? imageBase64 
+        : `data:image/png;base64,${imageBase64}`
     } else {
-      requestBody.imageUrl = imageUrl
+      requestPayload.image_url = imageUrl
     }
 
-    // Step 1: Create a task to generate a 3D model from the image
-    // Updated to use the correct API endpoint path based on Meshy's latest API docs
-    const createTaskResponse = await fetch('https://api.meshy.ai/v2/image-to-3d/tasks', {
+    // Using the v1 OpenAPI endpoint for a simpler, direct conversion
+    const response = await fetch('https://api.meshy.ai/openapi/v1/image-to-3d', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${MESHY_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestPayload)
     })
 
-    if (!createTaskResponse.ok) {
-      const errorText = await createTaskResponse.text()
-      console.error(`Error creating task: ${errorText}`)
-      throw new Error(`Failed to create 3D conversion task: ${errorText}`)
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Error during 3D conversion: ${errorText}`)
+      throw new Error(`Failed to convert image to 3D model: ${errorText}`)
     }
 
-    const taskData = await createTaskResponse.json()
-    const taskId = taskData.taskId || taskData.id
-
-    if (!taskId) {
-      console.error("No task ID in response:", taskData)
-      throw new Error('No task ID returned from Meshy API')
-    }
-
-    console.log(`Task created with ID: ${taskId}`)
-
-    // Step 2: Poll the task status until it's complete (with a timeout)
-    let modelUrl = null
-    let attempts = 0
-    const maxAttempts = 30
-    const delayMs = 2000
-
-    while (attempts < maxAttempts) {
-      attempts++
-      
-      // Wait before checking status
-      await new Promise(resolve => setTimeout(resolve, delayMs))
-      
-      console.log(`Checking task status, attempt ${attempts}/${maxAttempts}`)
-      // Updated to use the correct task status endpoint
-      const statusResponse = await fetch(`https://api.meshy.ai/v2/tasks/${taskId}`, {
-        headers: {
-          'Authorization': `Bearer ${MESHY_API_KEY}`,
-        }
-      })
-
-      if (!statusResponse.ok) {
-        const errorText = await statusResponse.text()
-        console.error(`Error checking status: ${errorText}`)
-        throw new Error(`Failed to check task status: ${errorText}`)
-      }
-
-      const statusData = await statusResponse.json()
-      console.log(`Task status: ${statusData.status}, attempt ${attempts}/${maxAttempts}`)
-
-      if (statusData.status === 'SUCCESS') {
-        modelUrl = statusData.result?.glbUrl || statusData.output?.glbUrl || null
-        console.log(`Task completed successfully. Model URL: ${modelUrl}`)
-        break
-      } else if (statusData.status === 'FAILED') {
-        console.error(`Task failed: ${statusData.message || 'Unknown error'}`)
-        throw new Error(`Task failed: ${statusData.message || 'Unknown error'}`)
-      }
-      
-      // If we're still processing, continue polling
-    }
-
+    // Parse the response from Meshy API
+    const result = await response.json()
+    
+    console.log("3D conversion succeeded, result:", JSON.stringify(result))
+    
+    // Get the model URL from the response
+    const modelUrl = result.glb_url || result.glbUrl || result.model_url
+    
     if (!modelUrl) {
-      throw new Error('Task did not complete in the allotted time or no model URL was returned')
+      throw new Error('No model URL returned from conversion API')
     }
 
     // Create Supabase client to update the database with the model URL if needed
@@ -145,7 +107,12 @@ serve(async (req: Request) => {
       JSON.stringify({ 
         success: true, 
         modelUrl,
-        taskId
+        // Include additional metadata if available in the response
+        metadata: {
+          format: result.format || 'glb',
+          fileSize: result.file_size || null,
+          conversionId: result.id || null
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
