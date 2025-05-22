@@ -25,11 +25,11 @@ const Header = () => {
         </div>
         
         <nav className="hidden md:flex items-center gap-8">
-          <Link to="/solutions" className="text-sm text-white/70 hover:text-white transition-colors">
-            Solutions
+          <Link to="/studio" className="text-sm text-white/70 hover:text-white transition-colors">
+            Studio
           </Link>
-          <Link to="/resources" className="text-sm text-white/70 hover:text-white transition-colors">
-            Resources
+          <Link to="/gallery" className="text-sm text-white/70 hover:text-white transition-colors">
+            Gallery
           </Link>
           <Link to="/community" className="text-sm text-white/70 hover:text-white transition-colors">
             Community
@@ -41,10 +41,10 @@ const Header = () => {
         
         <div className="flex items-center gap-4">
           <Button variant="ghost" className="text-sm hidden md:inline-flex">
-            Login
+            Sign In
           </Button>
           <Button className="bg-figuro-accent hover:bg-figuro-accent-hover text-white">
-            Start free
+            Create Now
           </Button>
         </div>
       </div>
