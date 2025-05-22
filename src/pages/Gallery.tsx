@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/Header";
@@ -8,9 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download, Upload, Box } from "lucide-react";
+import { Download, Upload, Box, Image as ImageIcon } from "lucide-react";
 import UploadModelModal from "@/components/UploadModelModal";
 import ModelViewer from "@/components/model-viewer";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface BucketImage {
   name: string;
@@ -18,6 +20,7 @@ interface BucketImage {
   id: string;
   created_at: string;
   fullPath?: string;
+  type: 'image' | '3d-model';  // Add type property to distinguish between images and 3D models
 }
 
 const Gallery = () => {
@@ -27,8 +30,18 @@ const Gallery = () => {
   const [customModelUrl, setCustomModelUrl] = useState<string | null>(null);
   const [customModelFile, setCustomModelFile] = useState<File | null>(null);
   const [viewingModel, setViewingModel] = useState<string | null>(null);
+  const [modelViewerOpen, setModelViewerOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Helper function to determine file type based on extension
+  const getFileType = (filename: string): 'image' | '3d-model' => {
+    const extension = filename.split('.').pop()?.toLowerCase() || '';
+    if (extension === 'glb') {
+      return '3d-model';
+    }
+    return 'image';
+  };
   
   // Recursive function to list files in a folder and its subfolders
   const listFilesRecursively = async (path: string = ''): Promise<BucketImage[]> => {
@@ -67,7 +80,8 @@ const Gallery = () => {
           fullPath: fullPath,
           url: publicUrlData.publicUrl,
           id: file.id || fullPath,
-          created_at: file.created_at || new Date().toISOString()
+          created_at: file.created_at || new Date().toISOString(),
+          type: getFileType(file.name) // Determine file type based on extension
         };
       })
     );
@@ -84,22 +98,22 @@ const Gallery = () => {
     return [...processedFiles, ...filesFromSubFolders];
   };
   
-  // Load all images from the bucket
+  // Load all images and models from the bucket
   useEffect(() => {
     const fetchImagesFromBucket = async () => {
       setIsLoading(true);
       try {
         // Get all files recursively, starting from root
-        const allImages = await listFilesRecursively();
+        const allFiles = await listFilesRecursively();
         
         // Sort by creation date (newest first)
-        allImages.sort((a, b) => 
+        allFiles.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         
-        setImages(allImages);
+        setImages(allFiles);
       } catch (error) {
-        console.error("Error loading images from bucket:", error);
+        console.error("Error loading files from bucket:", error);
         toast({
           title: "Error loading gallery",
           description: "Could not load the gallery items. Please try again.",
@@ -118,7 +132,7 @@ const Gallery = () => {
       .on('postgres_changes', 
           { event: '*', schema: 'storage', table: 'objects', filter: "bucket_id=eq.figurine-images" }, 
           () => {
-            // When storage changes, refetch the images
+            // When storage changes, refetch the files
             fetchImagesFromBucket();
           }
       )
@@ -143,6 +157,11 @@ const Gallery = () => {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  const handleViewModel = (modelUrl: string) => {
+    setViewingModel(modelUrl);
+    setModelViewerOpen(true);
   };
 
   // Handle model upload from modal
@@ -174,15 +193,15 @@ const Gallery = () => {
         });
         
         // Refresh the gallery
-        const fetchImagesFromBucket = async () => {
-          const allImages = await listFilesRecursively();
-          allImages.sort((a, b) => 
+        const fetchFiles = async () => {
+          const allFiles = await listFilesRecursively();
+          allFiles.sort((a, b) => 
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           );
-          setImages(allImages);
+          setImages(allFiles);
         };
         
-        fetchImagesFromBucket();
+        fetchFiles();
       } catch (error) {
         console.error('Error uploading model:', error);
         toast({
@@ -250,29 +269,57 @@ const Gallery = () => {
             </div>
           ) : images.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {images.map((image, index) => (
+              {images.map((file, index) => (
                 <motion.div 
-                  key={image.id}
+                  key={file.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                   className="glass-panel rounded-lg overflow-hidden group"
                 >
                   <div className="aspect-square relative overflow-hidden bg-white/5">
-                    <img 
-                      src={`${image.url}?t=${Date.now()}`} 
-                      alt={image.name} 
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      loading="lazy"
-                    />
+                    {file.type === 'image' ? (
+                      <img 
+                        src={`${file.url}?t=${Date.now()}`} 
+                        alt={file.name} 
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gray-800/50">
+                        <Box size={48} className="text-figuro-accent mb-2" />
+                        <p className="text-center text-sm font-medium truncate max-w-full">
+                          {file.name}
+                        </p>
+                        <p className="text-white/50 text-xs mt-1">3D Model</p>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
                       <div className="p-4 w-full">
-                        <Button 
-                          onClick={() => handleDownload(image.url, image.name)}
-                          className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
-                        >
-                          <Download size={16} className="mr-2" /> Download
-                        </Button>
+                        {file.type === 'image' ? (
+                          <Button 
+                            onClick={() => handleDownload(file.url, file.name)}
+                            className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
+                          >
+                            <Download size={16} className="mr-2" /> Download
+                          </Button>
+                        ) : (
+                          <div className="flex flex-col space-y-2 w-full">
+                            <Button 
+                              onClick={() => handleViewModel(file.url)}
+                              className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
+                            >
+                              <Eye size={16} className="mr-2" /> View Model
+                            </Button>
+                            <Button 
+                              onClick={() => handleDownload(file.url, file.name)}
+                              variant="outline"
+                              className="w-full border-white/10"
+                            >
+                              <Download size={16} className="mr-2" /> Download
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -316,6 +363,18 @@ const Gallery = () => {
         onOpenChange={setUploadModalOpen}
         onModelUpload={handleModelUpload}
       />
+      
+      {/* 3D Model Viewer Dialog */}
+      <Dialog open={modelViewerOpen} onOpenChange={setModelViewerOpen}>
+        <DialogContent className="sm:max-w-[800px] p-0 bg-transparent border-none shadow-none">
+          {viewingModel && (
+            <ModelViewer 
+              modelUrl={viewingModel} 
+              isLoading={false}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
       
       <Footer />
     </div>
