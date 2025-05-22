@@ -50,10 +50,10 @@ const ImagePreview = ({
           {imageSrc && (
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant="outline" className="border-green-400/30 bg-green-400/10 text-green-400 text-xs">
+                <TooltipTrigger>
+                  <div className="border-green-400/30 bg-green-400/10 text-green-400 text-xs rounded-full px-2.5 py-0.5 inline-flex items-center">
                     <Share2 size={12} className="mr-1" /> Public
-                  </Badge>
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>This image will appear in the community gallery</p>
@@ -62,9 +62,9 @@ const ImagePreview = ({
             </TooltipProvider>
           )}
           {generationMethod && (
-            <Badge variant="outline" className="border-white/20 text-xs">
+            <div className="border-white/20 text-xs rounded-full px-2.5 py-0.5 inline-flex items-center">
               {generationMethod === "edge" ? "Edge Function" : "Direct API"}
-            </Badge>
+            </div>
           )}
           {imageSrc && (
             <Button 

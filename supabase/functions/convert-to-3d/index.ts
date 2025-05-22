@@ -50,8 +50,8 @@ serve(async (req: Request) => {
     
     // Get current URL to construct the webhook callback URL
     const url = new URL(req.url)
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || `${url.protocol}//${url.hostname}`
-    const callbackUrl = `${supabaseUrl}/functions/v1/check-3d-status?webhook=true`
+    const baseUrl = Deno.env.get('SUPABASE_URL') || `${url.protocol}//${url.hostname}`
+    const callbackUrl = `${baseUrl}/functions/v1/check-3d-status?webhook=true`
     
     console.log("Creating 3D conversion request with webhook callback...")
     console.log(`Webhook callback URL: ${callbackUrl}`)
@@ -105,12 +105,11 @@ serve(async (req: Request) => {
     }
     
     // Create Supabase client for storing task info
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     
-    if (supabaseUrl && supabaseServiceKey) {
+    if (baseUrl && supabaseServiceKey) {
       try {
-        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+        const supabase = createClient(baseUrl, supabaseServiceKey)
         
         // Store task information - this is useful for tracking webhooks
         await supabase.from('conversion_tasks').upsert({
