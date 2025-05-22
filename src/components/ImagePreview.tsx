@@ -22,6 +22,7 @@ const ImagePreview = ({
   generationMethod 
 }: ImagePreviewProps) => {
   const { toast } = useToast();
+  const [imageError, setImageError] = React.useState<boolean>(false);
   
   if (!imageSrc && !isLoading) {
     return null;
@@ -53,6 +54,16 @@ const ImagePreview = ({
     }
   };
 
+  const handleImageError = () => {
+    console.error("Error loading image:", imageSrc);
+    setImageError(true);
+    toast({
+      title: "Error loading image",
+      description: "There was an error loading the image. Try generating a new one.",
+      variant: "destructive",
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -82,7 +93,7 @@ const ImagePreview = ({
               {generationMethod === "edge" ? "Edge Function" : "Direct API"}
             </div>
           )}
-          {imageSrc && (
+          {imageSrc && !imageError && (
             <Button 
               variant="outline" 
               size="sm"
@@ -113,14 +124,19 @@ const ImagePreview = ({
                 src={imageSrc}
                 alt="Generated figurine"
                 className="w-full h-full object-contain rounded-lg"
-                onError={(e) => {
-                  console.error("Error loading image:", e);
-                  (e.target as HTMLImageElement).src = '/placeholder.svg';
-                }}
+                onError={handleImageError}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white/50">
                 No image generated yet
+              </div>
+            )}
+            {imageError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
+                <div className="text-center p-4">
+                  <p className="text-red-400 mb-2">Error loading image</p>
+                  <p className="text-sm text-white/70">Try generating a new image</p>
+                </div>
               </div>
             )}
           </motion.div>
@@ -131,7 +147,7 @@ const ImagePreview = ({
         <Button
           className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
           onClick={onConvertTo3D}
-          disabled={!imageSrc || isConverting || isLoading}
+          disabled={!imageSrc || isConverting || isLoading || imageError}
         >
           {isConverting ? "Converting..." : "Convert to 3D"}
         </Button>

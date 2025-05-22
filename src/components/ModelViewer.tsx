@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import { Download } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
+import { addCorsProxy, tryLoadWithCorsProxies } from "@/utils/corsProxy";
 
 interface ModelViewerProps {
   modelUrl: string | null;
@@ -36,14 +36,47 @@ const LoadingSpinner = () => (
 
 // This component will load and display the actual 3D model
 const Model = ({ url, onError }: { url: string; onError: (error: any) => void }) => {
+  const [modelUrl, setModelUrl] = useState(url);
+  const [proxyAttempts, setProxyAttempts] = useState(0);
+  const [isUsingProxy, setIsUsingProxy] = useState(false);
   const { toast } = useToast();
-  
-  // Use try-catch for handling model loading errors
+
+  useEffect(() => {
+    // First try with the original URL, then try with proxies if that fails
+    tryLoadWithCorsProxies(
+      url,
+      (loadedUrl) => {
+        setModelUrl(loadedUrl);
+        setIsUsingProxy(loadedUrl !== url);
+        if (loadedUrl !== url) {
+          console.log(`Successfully loaded model using CORS proxy: ${loadedUrl !== url ? 'Yes' : 'No'}`);
+        }
+      },
+      (error) => {
+        console.error("All loading attempts failed:", error);
+        onError(error);
+      }
+    );
+  }, [url, onError]);
+
   try {
     // Set a timeout for the model loading
-    const { scene } = useGLTF(url, undefined, undefined, (error) => {
+    const { scene } = useGLTF(modelUrl, undefined, undefined, (error) => {
       console.error("Error loading 3D model:", error);
-      onError(error);
+      
+      // If we failed but haven't tried proxies yet, try with a proxy now
+      if (proxyAttempts < 2 && !isUsingProxy) {
+        const nextProxyIndex = proxyAttempts;
+        const proxiedUrl = addCorsProxy(url, nextProxyIndex);
+        console.log(`Trying with proxy ${nextProxyIndex}:`, proxiedUrl);
+        
+        setProxyAttempts(prev => prev + 1);
+        setModelUrl(proxiedUrl);
+        setIsUsingProxy(true);
+      } else {
+        // We've tried everything, pass the error up
+        onError(error);
+      }
     });
     
     useEffect(() => {
@@ -60,10 +93,14 @@ const Model = ({ url, onError }: { url: string; onError: (error: any) => void })
       });
       
       return () => {
-        // Clean up to avoid memory leaks
-        useGLTF.preload(url);
+        try {
+          // Clean up to avoid memory leaks
+          useGLTF.preload(modelUrl);
+        } catch (e) {
+          console.log("Cleanup error:", e);
+        }
       };
-    }, [url, scene]);
+    }, [modelUrl, scene]);
 
     return (
       <Center scale={[1.5, 1.5, 1.5]}>
@@ -94,12 +131,15 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
   const [modelError, setModelError] = useState<string | null>(null);
   const [modelLoadAttempted, setModelLoadAttempted] = useState(false);
   const { toast } = useToast();
+  // Keep track of original URL for downloads
+  const originalUrlRef = useRef<string | null>(modelUrl);
 
   // Reset error state when modelUrl changes
   useEffect(() => {
     if (modelUrl) {
       setModelError(null);
       setModelLoadAttempted(false);
+      originalUrlRef.current = modelUrl;
     }
   }, [modelUrl]);
 
@@ -108,20 +148,32 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
   }
 
   const handleDownload = () => {
-    if (!modelUrl) return;
+    if (!originalUrlRef.current) return;
     
-    // Create a temporary anchor element
-    const a = document.createElement('a');
-    a.href = modelUrl;
-    a.download = `figurine-model-${new Date().getTime()}.glb`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    toast({
-      title: "Download started",
-      description: "Your 3D model download has started."
-    });
+    try {
+      // Always use the original URL for downloads, not the proxied version
+      const downloadUrl = originalUrlRef.current;
+      
+      // Create a temporary anchor element
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `figurine-model-${new Date().getTime()}.glb`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download started",
+        description: "Your 3D model download has started."
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download failed",
+        description: "Failed to download the model. Try again or check console for details.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleModelError = (error: any) => {
@@ -130,14 +182,16 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
     let errorMsg = "Failed to load 3D model. The download may still work.";
     
     // Check for specific CORS or network errors
-    if (error.message && error.message.includes("Failed to fetch")) {
-      errorMsg = "Network error loading 3D model. The model URL might be restricted or unavailable in your browser.";
+    if (error.message) {
+      if (error.message.includes("Failed to fetch")) {
+        errorMsg = "Network error loading 3D model. The model URL might be restricted by CORS policy. Try the download button instead.";
+      } else if (error.message.includes("Cross-Origin")) {
+        errorMsg = "CORS policy prevented loading the 3D model. Try the download button instead.";
+      }
     }
     
     setModelError(errorMsg);
     setModelLoadAttempted(true);
-    
-    // Don't show a toast for errors that are already displayed in the UI
   };
 
   // Determine if we should show an error message
