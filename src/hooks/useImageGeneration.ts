@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
-import { generateImageWithEdge } from "@/lib/edgeFunction";
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -12,9 +11,10 @@ export const useImageGeneration = () => {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [requiresApiKey, setRequiresApiKey] = useState(false);
   const [currentFigurineId, setCurrentFigurineId] = useState<string | null>(null);
+  const [generationMethod, setGenerationMethod] = useState<"edge" | "direct" | null>(null);
   const { toast } = useToast();
 
-  // Generate image using the Edge Function or directly
+  // Generate image using a single generation attempt strategy
   const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string) => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
     
@@ -22,6 +22,7 @@ export const useImageGeneration = () => {
     setGeneratedImage(null);
     setModelUrl(null);
     setCurrentFigurineId(null);
+    setGenerationMethod(null);
     
     try {
       let imageUrl: string | null = null;
@@ -30,66 +31,44 @@ export const useImageGeneration = () => {
       // Use the pre-generated image URL if provided
       if (preGeneratedImageUrl) {
         imageUrl = preGeneratedImageUrl;
+        setGenerationMethod("edge"); // Assume it came from edge if pre-generated
         
         // Fetch the blob from the URL for storage
         const response = await fetch(preGeneratedImageUrl);
         imageBlob = await response.blob();
       } else {
-        // Try the edge function first
-        try {
-          // Call the edge function
-          const result = await generateImage(prompt, style, savedApiKey);
-          
-          if (result.error) {
-            // Check if the error is about API key
-            if (result.error.includes("API key") || result.error.includes("unauthorized")) {
-              setRequiresApiKey(true);
-              return { success: false, needsApiKey: true };
-            }
-            
-            throw new Error(result.error);
+        // Make a single generation request to the service layer
+        console.log("Making single generation request to service layer");
+        const result = await generateImage(prompt, style, savedApiKey);
+        
+        if (result.error) {
+          // Check if the error is about API key
+          if (result.error.includes("API key") || result.error.includes("unauthorized")) {
+            setRequiresApiKey(true);
+            return { success: false, needsApiKey: true };
           }
           
-          // We don't need an API key anymore if we got a successful response
-          setRequiresApiKey(false);
-          
-          imageBlob = result.blob;
-          imageUrl = result.url;
-        } catch (edgeFunctionError) {
-          console.warn("Edge function failed, trying direct API call:", edgeFunctionError);
-          
-          // Fallback to direct API call using edgeFunction.ts
-          const edgeResult = await generateImageWithEdge({
-            prompt,
-            style, 
-            apiKey: savedApiKey
-          });
-          
-          if (!edgeResult.success) {
-            if (edgeResult.needsApiKey) {
-              setRequiresApiKey(true);
-              return { success: false, needsApiKey: true };
-            }
-            throw new Error(edgeResult.error || "Failed to generate image");
-          }
-          
-          setRequiresApiKey(false);
-          imageUrl = edgeResult.imageUrl || null;
-          
-          if (imageUrl) {
-            // Fetch the blob from the URL for storage
-            const response = await fetch(imageUrl);
-            imageBlob = await response.blob();
-          }
+          throw new Error(result.error);
         }
         
-        if (imageUrl) {
-          setGeneratedImage(imageUrl);
-        }
+        setGenerationMethod(result.method);
+        
+        // We don't need an API key anymore if we got a successful response
+        setRequiresApiKey(false);
+        
+        imageBlob = result.blob;
+        imageUrl = result.url;
       }
       
       // Save the figurine to Supabase if we have an image
       if (imageUrl) {
+        setGeneratedImage(imageUrl);
+        
+        toast({
+          title: "Image generated",
+          description: `Created "${prompt}" in ${style} style using ${generationMethod || "API"} method`,
+        });
+        
         const figurineId = await saveFigurine(prompt, style, imageUrl, imageBlob);
         
         if (figurineId) {
@@ -153,6 +132,7 @@ export const useImageGeneration = () => {
     handleGenerate,
     handleConvertTo3D,
     requiresApiKey,
-    currentFigurineId
+    currentFigurineId,
+    generationMethod
   };
 };

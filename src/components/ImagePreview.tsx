@@ -3,15 +3,23 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface ImagePreviewProps {
   imageSrc: string | null;
   isLoading: boolean;
   onConvertTo3D: () => void;
   isConverting: boolean;
+  generationMethod?: "edge" | "direct" | null;
 }
 
-const ImagePreview = ({ imageSrc, isLoading, onConvertTo3D, isConverting }: ImagePreviewProps) => {
+const ImagePreview = ({ 
+  imageSrc, 
+  isLoading, 
+  onConvertTo3D, 
+  isConverting, 
+  generationMethod 
+}: ImagePreviewProps) => {
   if (!imageSrc && !isLoading) {
     return null;
   }
@@ -37,17 +45,24 @@ const ImagePreview = ({ imageSrc, isLoading, onConvertTo3D, isConverting }: Imag
     >
       <div className="p-4 border-b border-white/10 flex justify-between items-center">
         <h3 className="text-lg font-medium">Generated Image</h3>
-        {imageSrc && (
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="border-white/10 hover:border-white/30"
-            onClick={handleSaveImage}
-          >
-            <Download size={16} className="mr-1" />
-            Save
-          </Button>
-        )}
+        <div className="flex gap-2 items-center">
+          {generationMethod && (
+            <Badge variant="outline" className="border-white/20 text-xs">
+              {generationMethod === "edge" ? "Edge Function" : "Direct API"}
+            </Badge>
+          )}
+          {imageSrc && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="border-white/10 hover:border-white/30"
+              onClick={handleSaveImage}
+            >
+              <Download size={16} className="mr-1" />
+              Save
+            </Button>
+          )}
+        </div>
       </div>
       
       <div className="relative aspect-square">
