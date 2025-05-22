@@ -5,6 +5,17 @@ import { formatStylePrompt } from "@/lib/huggingface";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 
+// Define a more flexible profiles type
+interface Profile {
+  id: string;
+  avatar_url?: string | null;
+  created_at?: string | null;
+  display_name?: string | null;
+  updated_at?: string | null;
+  generation_count?: number | null;
+  [key: string]: any; // Allow for additional properties
+}
+
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
@@ -33,9 +44,12 @@ export const useImageGeneration = () => {
             return;
           }
           
-          // Use optional chaining and nullish coalescing for type safety
-          const generationCount = profileData && 'generation_count' in profileData 
-            ? (profileData.generation_count as number || 0)
+          // Cast profileData to our more flexible Profile type
+          const profile = profileData as Profile;
+          
+          // Check if generation_count exists and is a number
+          const generationCount = profile && typeof profile.generation_count === 'number' 
+            ? profile.generation_count 
             : 0;
           
           // Users are allowed 4 generations
@@ -195,7 +209,8 @@ export const useImageGeneration = () => {
             inc_amount: 1,
             table_name: 'profiles',
             column_name: 'generation_count',
-            id: session.user.id 
+            id: session.user.id,
+            id_column: 'id'
           });
           
           if (rpcError) {
@@ -210,19 +225,18 @@ export const useImageGeneration = () => {
               .single();
               
             if (profileData) {
-              // Only try to update if we have generation_count column 
-              // Using type casting to handle the dynamic property
-              const currentCount = profileData.generation_count !== undefined 
-                ? (profileData.generation_count as number) 
-                : 0;
-                
-              // Use a partial update with a type assertion to handle the dynamic property
+              // Cast to our flexible Profile type
+              const profile = profileData as Profile;
+              
+              // Only try to update if we have valid data
+              const currentCount = typeof profile.generation_count === 'number' ? profile.generation_count : 0;
+              
+              // Use a safe update approach
               await supabase
                 .from('profiles')
                 .update({ 
-                  // Use type assertion to avoid TypeScript errors with dynamic properties
-                  ...(profileData.generation_count !== undefined ? { generation_count: currentCount + 1 } : {})
-                } as any)
+                  generation_count: currentCount + 1 
+                })
                 .eq('id', session.user.id);
             }
           }
@@ -307,4 +321,3 @@ export const useImageGeneration = () => {
     generationsLeft
   };
 };
-
