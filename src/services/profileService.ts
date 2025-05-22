@@ -23,14 +23,15 @@ export const incrementGenerationCount = async (): Promise<void> => {
       id_column: string;
     }
     
-    // Fix: Use type assertion for both the function call and the return value
-    const { error: rpcError } = await (supabase.rpc('increment', {
+    // Fix: Simplify the type assertion approach
+    const { error: rpcError } = await supabase.rpc('increment', {
       inc_amount: 1,
       table_name: 'profiles',
       column_name: 'generation_count',
       id: session.user.id,
       id_column: 'id'
-    }) as unknown as Promise<{ error: any }>);
+    // Use a simpler type assertion approach
+    }) as unknown as { error: any };
     
     if (rpcError) {
       console.error('Error incrementing generation count via RPC:', rpcError);
