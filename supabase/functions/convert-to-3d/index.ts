@@ -32,7 +32,7 @@ serve(async (req: Request) => {
       )
     }
 
-    console.log(`Converting image to 3D model: ${imageUrl}`)
+    console.log(`Processing image for 3D conversion: ${imageUrl}`)
 
     // Get Meshy.ai API key from environment variables
     const MESHY_API_KEY = Deno.env.get('MESHY_API_KEY')
@@ -42,6 +42,8 @@ serve(async (req: Request) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       )
     }
+
+    console.log("Creating 3D conversion task...")
 
     // Step 1: Create a task to generate a 3D model from the image
     const createTaskResponse = await fetch('https://api.meshy.ai/v2/image-to-3d', {
@@ -59,6 +61,7 @@ serve(async (req: Request) => {
 
     if (!createTaskResponse.ok) {
       const errorText = await createTaskResponse.text()
+      console.error(`Error creating task: ${errorText}`)
       throw new Error(`Failed to create 3D conversion task: ${errorText}`)
     }
 
@@ -66,6 +69,7 @@ serve(async (req: Request) => {
     const taskId = taskData.taskId
 
     if (!taskId) {
+      console.error("No task ID in response:", taskData)
       throw new Error('No task ID returned from Meshy API')
     }
 
@@ -74,7 +78,7 @@ serve(async (req: Request) => {
     // Step 2: Poll the task status until it's complete (with a timeout)
     let modelUrl = null
     let attempts = 0
-    const maxAttempts = 20
+    const maxAttempts = 30
     const delayMs = 2000
 
     while (attempts < maxAttempts) {
@@ -83,6 +87,7 @@ serve(async (req: Request) => {
       // Wait before checking status
       await new Promise(resolve => setTimeout(resolve, delayMs))
       
+      console.log(`Checking task status, attempt ${attempts}/${maxAttempts}`)
       const statusResponse = await fetch(`https://api.meshy.ai/v2/task-status?taskId=${taskId}`, {
         headers: {
           'Authorization': `Bearer ${MESHY_API_KEY}`,
@@ -91,6 +96,7 @@ serve(async (req: Request) => {
 
       if (!statusResponse.ok) {
         const errorText = await statusResponse.text()
+        console.error(`Error checking status: ${errorText}`)
         throw new Error(`Failed to check task status: ${errorText}`)
       }
 
@@ -99,8 +105,10 @@ serve(async (req: Request) => {
 
       if (statusData.status === 'SUCCESS') {
         modelUrl = statusData.result?.glbUrl || null
+        console.log(`Task completed successfully. Model URL: ${modelUrl}`)
         break
       } else if (statusData.status === 'FAILED') {
+        console.error(`Task failed: ${statusData.message || 'Unknown error'}`)
         throw new Error(`Task failed: ${statusData.message || 'Unknown error'}`)
       }
       
@@ -111,7 +119,7 @@ serve(async (req: Request) => {
       throw new Error('Task did not complete in the allotted time or no model URL was returned')
     }
 
-    // Create Supabase client to update the database
+    // Create Supabase client to update the database with the model URL if needed
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
