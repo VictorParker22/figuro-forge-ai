@@ -1,7 +1,9 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
+import { generateImageWithEdge } from "@/lib/edgeFunction";
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -33,24 +35,54 @@ export const useImageGeneration = () => {
         const response = await fetch(preGeneratedImageUrl);
         imageBlob = await response.blob();
       } else {
-        // Otherwise call the edge function
-        const result = await generateImage(prompt, style, savedApiKey);
-        
-        if (result.error) {
-          // Check if the error is about API key
-          if (result.error.includes("API key") || result.error.includes("unauthorized")) {
-            setRequiresApiKey(true);
-            return { success: false, needsApiKey: true };
+        // Try the edge function first
+        try {
+          // Call the edge function
+          const result = await generateImage(prompt, style, savedApiKey);
+          
+          if (result.error) {
+            // Check if the error is about API key
+            if (result.error.includes("API key") || result.error.includes("unauthorized")) {
+              setRequiresApiKey(true);
+              return { success: false, needsApiKey: true };
+            }
+            
+            throw new Error(result.error);
           }
           
-          throw new Error(result.error);
+          // We don't need an API key anymore if we got a successful response
+          setRequiresApiKey(false);
+          
+          imageBlob = result.blob;
+          imageUrl = result.url;
+        } catch (edgeFunctionError) {
+          console.warn("Edge function failed, trying direct API call:", edgeFunctionError);
+          
+          // Fallback to direct API call using edgeFunction.ts
+          const edgeResult = await generateImageWithEdge({
+            prompt,
+            style, 
+            apiKey: savedApiKey
+          });
+          
+          if (!edgeResult.success) {
+            if (edgeResult.needsApiKey) {
+              setRequiresApiKey(true);
+              return { success: false, needsApiKey: true };
+            }
+            throw new Error(edgeResult.error || "Failed to generate image");
+          }
+          
+          setRequiresApiKey(false);
+          imageUrl = edgeResult.imageUrl || null;
+          
+          if (imageUrl) {
+            // Fetch the blob from the URL for storage
+            const response = await fetch(imageUrl);
+            imageBlob = await response.blob();
+          }
         }
         
-        // We don't need an API key anymore if we got a successful response
-        setRequiresApiKey(false);
-        
-        imageBlob = result.blob;
-        imageUrl = result.url;
         if (imageUrl) {
           setGeneratedImage(imageUrl);
         }
@@ -62,8 +94,6 @@ export const useImageGeneration = () => {
         
         if (figurineId) {
           setCurrentFigurineId(figurineId);
-          
-          // Removed the incrementGenerationCount call
         }
       }
       

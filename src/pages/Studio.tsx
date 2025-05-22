@@ -122,16 +122,11 @@ const Studio = () => {
       console.error("Generation error:", error);
       
       // Fall back to the direct generation method
+      console.log("Falling back to direct API call");
       const result = await handleGenerate(prompt, style, apiKey);
       
       if (result.needsApiKey) {
         setShowApiInput(true);
-      } else {
-        toast({
-          title: "Generation failed",
-          description: error instanceof Error ? error.message : "Failed to generate image",
-          variant: "destructive",
-        });
       }
     }
   };

@@ -1,9 +1,12 @@
+
 import { formatStylePrompt } from "@/lib/huggingface";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { generateImageWithEdge } from "@/lib/edgeFunction";
 
 // Generate image using edge function
 export const generateImage = async (prompt: string, style: string, apiKey: string = ""): Promise<{blob: Blob | null, url: string | null, error?: string}> => {
   try {
+    // First try the edge function
     const response = await fetch(`${window.location.origin}/functions/v1/generate-image`, {
       method: "POST",
       headers: {
@@ -19,10 +22,37 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
     
     // Handle 404 errors (edge function not deployed)
     if (response.status === 404) {
+      console.warn("Edge function not found, falling back to direct API call");
+      
+      // Fallback to direct API call
+      const edgeResult = await generateImageWithEdge({
+        prompt,
+        style, 
+        apiKey
+      });
+      
+      if (!edgeResult.success) {
+        return { 
+          blob: null, 
+          url: null,
+          error: edgeResult.error || "Failed to generate image with fallback method"
+        };
+      }
+      
+      if (edgeResult.imageUrl) {
+        // Fetch the blob from the URL
+        const blobResponse = await fetch(edgeResult.imageUrl);
+        const blob = await blobResponse.blob();
+        return {
+          blob,
+          url: edgeResult.imageUrl
+        };
+      }
+      
       return { 
         blob: null, 
         url: null,
-        error: "Edge function not found. Please make sure the function is deployed."
+        error: "No image URL returned from fallback API"
       };
     }
     

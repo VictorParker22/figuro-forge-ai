@@ -6,6 +6,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Format prompt according to selected style
+function formatStylePrompt(basePrompt: string, style: string): string {
+  switch (style) {
+    case "isometric":
+      return `${basePrompt}, RBNBICN, icon, white background, isometric perspective, 3D-like, clean lines, detailed, professional design, high quality`;
+    case "anime":
+      return `${basePrompt}, anime style, vibrant colors, white background`;
+    case "pixar":
+      return `${basePrompt}, pixar style, 3D character, white background`;
+    case "steampunk":
+      return `${basePrompt}, steampunk style, brass gears, vintage, white background`;
+    case "lowpoly":
+      return `${basePrompt}, low poly 3D model, geometric, white background`;
+    case "cyberpunk":
+      return `${basePrompt}, cyberpunk style, neon colors, futuristic, white background`;
+    case "realistic":
+      return `${basePrompt}, realistic 3D render, detailed texture, white background`;
+    case "chibi":
+      return `${basePrompt}, chibi style, cute, small body, big head, white background`;
+    default:
+      return `${basePrompt}, 3D figurine, white background`;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -107,27 +131,3 @@ serve(async (req) => {
     );
   }
 });
-
-// Format prompt according to selected style
-function formatStylePrompt(basePrompt: string, style: string): string {
-  switch (style) {
-    case "isometric":
-      return `${basePrompt}, RBNBICN, icon, white background, isometric perspective, 3D-like, clean lines, detailed, professional design, high quality`;
-    case "anime":
-      return `${basePrompt}, anime style, vibrant colors, white background`;
-    case "pixar":
-      return `${basePrompt}, pixar style, 3D character, white background`;
-    case "steampunk":
-      return `${basePrompt}, steampunk style, brass gears, vintage, white background`;
-    case "lowpoly":
-      return `${basePrompt}, low poly 3D model, geometric, white background`;
-    case "cyberpunk":
-      return `${basePrompt}, cyberpunk style, neon colors, futuristic, white background`;
-    case "realistic":
-      return `${basePrompt}, realistic 3D render, detailed texture, white background`;
-    case "chibi":
-      return `${basePrompt}, chibi style, cute, small body, big head, white background`;
-    default:
-      return `${basePrompt}, 3D figurine, white background`;
-  }
-}
