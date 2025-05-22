@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -12,12 +11,15 @@ import { useImageGeneration } from "@/hooks/useImageGeneration";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Upload } from "lucide-react";
+import UploadModelModal from "@/components/UploadModelModal";
 
 const Studio = () => {
   const [apiKey, setApiKey] = useState<string | "">("");
   const [showApiInput, setShowApiInput] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [customModelUrl, setCustomModelUrl] = useState<string | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const { toast } = useToast();
   
   const {
@@ -87,6 +89,15 @@ const Studio = () => {
     }
   };
 
+  // Handle model upload from modal
+  const handleModelUpload = (url: string, file: File) => {
+    setCustomModelUrl(url);
+    toast({
+      title: "Model uploaded",
+      description: `${file.name} has been loaded successfully`,
+    });
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast({
@@ -116,19 +127,30 @@ const Studio = () => {
         <div className="container mx-auto px-4">
           <StudioHeader />
           
-          <div className="mb-8 flex justify-end">
-            {user ? (
-              <div className="flex items-center gap-4">
-                <span className="text-white">Welcome, {user.email}</span>
-                <Button onClick={handleSignOut} variant="outline" className="border-white/10">
-                  Sign Out
+          <div className="mb-8 flex justify-between items-center">
+            <Button 
+              onClick={() => setUploadModalOpen(true)}
+              variant="outline" 
+              className="border-white/10 hover:border-white/30"
+            >
+              <Upload size={16} className="mr-2" />
+              Upload 3D Model
+            </Button>
+            
+            <div className="flex items-center gap-4">
+              {user ? (
+                <div className="flex items-center gap-4">
+                  <span className="text-white">Welcome, {user.email}</span>
+                  <Button onClick={handleSignOut} variant="outline" className="border-white/10">
+                    Sign Out
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={handleSignIn} variant="outline" className="border-white/10">
+                  Sign In to Save
                 </Button>
-              </div>
-            ) : (
-              <Button onClick={handleSignIn} variant="outline" className="border-white/10">
-                Sign In to Save
-              </Button>
-            )}
+              )}
+            </div>
           </div>
           
           {showApiInput && (
@@ -176,6 +198,13 @@ const Studio = () => {
               <FigurineGallery />
             </div>
           )}
+
+          {/* Upload Model Modal */}
+          <UploadModelModal 
+            isOpen={uploadModalOpen}
+            onOpenChange={setUploadModalOpen}
+            onModelUpload={handleModelUpload}
+          />
         </div>
       </section>
       
@@ -185,4 +214,3 @@ const Studio = () => {
 };
 
 export default Studio;
-
