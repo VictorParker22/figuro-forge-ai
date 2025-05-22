@@ -1,8 +1,9 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -149,11 +150,17 @@ export const useImageGeneration = () => {
       
       console.log("Sending conversion request to edge function...");
       
+      // Use the correct Supabase URL for the edge function
+      const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/convert-to-3d`;
+      
+      console.log("Edge function URL:", edgeFunctionUrl);
+      
       // Call our Supabase Edge Function to convert the image to 3D
-      const response = await fetch(`${window.location.origin}/functions/v1/convert-to-3d`, {
+      const response = await fetch(edgeFunctionUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify(requestBody),
       });
@@ -163,9 +170,11 @@ export const useImageGeneration = () => {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorData.details || errorMessage;
+          console.error("Error response from edge function:", errorData);
         } catch (e) {
           // If we can't parse the error as JSON, use the status text
           errorMessage = `Error: ${response.status} ${response.statusText}`;
+          console.error("Error response from edge function (not JSON):", response.status, response.statusText);
         }
         throw new Error(errorMessage);
       }
