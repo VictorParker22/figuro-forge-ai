@@ -1,57 +1,62 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ArrowRight } from "lucide-react";
 
 const Hero = () => {
   return (
-    <section className="pt-32 pb-20 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-figuro-accent/5 to-transparent pointer-events-none" />
+    <section className="pt-32 pb-20 relative overflow-hidden min-h-screen flex items-center justify-center">
+      <div className="absolute inset-0 bg-figuro-dark pointer-events-none">
+        {/* Subtle gradient lines like in the image */}
+        <div className="absolute left-0 right-0 bottom-0 h-1/2 bg-gradient-to-t from-figuro-dark to-transparent opacity-80" />
+        <div className="absolute w-px h-[500px] bg-figuro-accent/10 rotate-12 left-[10%] top-[20%]"></div>
+        <div className="absolute w-px h-[700px] bg-figuro-accent/10 -rotate-12 right-[10%] top-[10%]"></div>
+      </div>
       
       <motion.div 
-        className="container mx-auto px-4 relative z-10"
+        className="container mx-auto px-4 relative z-10 text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
       >
-        <div className="flex flex-col items-center text-center">
+        <div className="max-w-4xl mx-auto">
           <motion.h1 
-            className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-gradient"
+            className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-white leading-tight"
             initial={{ y: 20 }}
             animate={{ y: 0 }}
             transition={{ delay: 0.2, duration: 0.8 }}
           >
-            Design AI-powered Figurines,
-            <br />
-            <span className="text-gradient-primary">Download in 3D</span>
+            Turn your design into a live web app
           </motion.h1>
           
           <motion.p 
-            className="text-lg md:text-xl text-white/70 max-w-3xl mb-10"
+            className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto mb-10"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            Transform your ideas into beautiful 3D figurines with just a text prompt.
-            Choose from various art styles, customize your creation, and get ready-to-print 3D models.
+            Generate, preview, and edit code instantly.
           </motion.p>
           
           <motion.div
-            className="flex flex-col sm:flex-row gap-4"
+            className="max-w-xl mx-auto"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.8 }}
           >
-            <Button size="lg" className="bg-figuro-accent hover:bg-figuro-accent-hover text-white px-8 py-6">
-              Start Creating
-            </Button>
-            <Button size="lg" variant="outline" className="border-white/20 text-white hover:border-white/40 px-8 py-6">
-              View Gallery
-            </Button>
+            <div className="flex rounded-md overflow-hidden bg-white/5 border border-white/10 focus-within:border-white/20">
+              <Input 
+                placeholder="Paste your Figma link here"
+                className="bg-transparent border-0 ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-white/90 flex-1"
+              />
+              <Button className="bg-figuro-accent hover:bg-figuro-accent-hover rounded-none px-4">
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </div>
           </motion.div>
         </div>
       </motion.div>
-      
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-figuro-dark to-transparent pointer-events-none" />
     </section>
   );
 };

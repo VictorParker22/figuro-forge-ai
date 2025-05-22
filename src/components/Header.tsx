@@ -25,29 +25,27 @@ const Header = () => {
         </div>
         
         <nav className="hidden md:flex items-center gap-8">
-          <Link to="/features" className="text-sm text-white/70 hover:text-white transition-colors">
-            Features
+          <Link to="/solutions" className="text-sm text-white/70 hover:text-white transition-colors">
+            Solutions
           </Link>
-          <Link to="/gallery" className="text-sm text-white/70 hover:text-white transition-colors">
-            Gallery
+          <Link to="/resources" className="text-sm text-white/70 hover:text-white transition-colors">
+            Resources
+          </Link>
+          <Link to="/community" className="text-sm text-white/70 hover:text-white transition-colors">
+            Community
           </Link>
           <Link to="/pricing" className="text-sm text-white/70 hover:text-white transition-colors">
             Pricing
-          </Link>
-          <Link to="/docs" className="text-sm text-white/70 hover:text-white transition-colors">
-            Docs
           </Link>
         </nav>
         
         <div className="flex items-center gap-4">
           <Button variant="ghost" className="text-sm hidden md:inline-flex">
-            Sign In
+            Login
           </Button>
-          <Link to="/studio">
-            <Button className="bg-figuro-accent text-white hover:bg-figuro-accent-hover">
-              Get Started
-            </Button>
-          </Link>
+          <Button className="bg-white text-figuro-dark hover:bg-white/90">
+            Start free
+          </Button>
         </div>
       </div>
     </motion.header>
