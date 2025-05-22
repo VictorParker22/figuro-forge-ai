@@ -14,6 +14,31 @@ export const useImageGeneration = () => {
   const [generationMethod, setGenerationMethod] = useState<"edge" | "direct" | null>(null);
   const { toast } = useToast();
 
+  // Helper function to convert image to base64
+  const imageUrlToBase64 = async (imageUrl: string): Promise<string | null> => {
+    try {
+      // Fetch the image
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      // Convert blob to base64
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          // Extract just the base64 part without the data URL prefix
+          const base64Data = base64String.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error("Error converting image to base64:", error);
+      return null;
+    }
+  };
+
   // Generate image using a single generation attempt strategy
   const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string) => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
@@ -106,15 +131,31 @@ export const useImageGeneration = () => {
     setIsConverting(true);
     
     try {
+      // Check if the image URL is a blob URL
+      const isBlobUrl = generatedImage.startsWith('blob:');
+      let requestBody: any = {};
+      
+      if (isBlobUrl) {
+        console.log("Converting blob URL to base64...");
+        const base64Data = await imageUrlToBase64(generatedImage);
+        if (!base64Data) {
+          throw new Error("Failed to convert image to base64");
+        }
+        requestBody = { imageBase64: base64Data };
+      } else {
+        // Use the URL directly
+        requestBody = { imageUrl: generatedImage };
+      }
+      
+      console.log("Sending conversion request to edge function...");
+      
       // Call our Supabase Edge Function to convert the image to 3D
       const response = await fetch(`${window.location.origin}/functions/v1/convert-to-3d`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
-          imageUrl: generatedImage 
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {

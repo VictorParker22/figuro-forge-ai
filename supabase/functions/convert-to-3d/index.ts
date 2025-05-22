@@ -23,16 +23,21 @@ serve(async (req: Request) => {
 
   try {
     // Parse request body
-    const { imageUrl } = await req.json()
+    const { imageUrl, imageBase64 } = await req.json()
 
-    if (!imageUrl) {
+    if (!imageUrl && !imageBase64) {
       return new Response(
-        JSON.stringify({ error: 'Image URL is required' }),
+        JSON.stringify({ error: 'Image URL or Base64 data is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
-    console.log(`Processing image for 3D conversion: ${imageUrl}`)
+    // Log which format we're using
+    if (imageBase64) {
+      console.log("Processing base64 image data for 3D conversion")
+    } else {
+      console.log(`Processing image URL for 3D conversion: ${imageUrl}`)
+    }
 
     // Get Meshy.ai API key from environment variables
     const MESHY_API_KEY = Deno.env.get('MESHY_API_KEY')
@@ -44,6 +49,19 @@ serve(async (req: Request) => {
     }
 
     console.log("Creating 3D conversion task...")
+    
+    // Prepare the request body based on what we received
+    const requestBody: any = {
+      outputFormat: 'glb',
+      background: 'remove'
+    }
+    
+    // Add either the URL or the base64 data
+    if (imageBase64) {
+      requestBody.imageBase64 = imageBase64
+    } else {
+      requestBody.imageUrl = imageUrl
+    }
 
     // Step 1: Create a task to generate a 3D model from the image
     const createTaskResponse = await fetch('https://api.meshy.ai/v2/image-to-3d', {
@@ -52,11 +70,7 @@ serve(async (req: Request) => {
         'Authorization': `Bearer ${MESHY_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        imageUrl: imageUrl,
-        outputFormat: 'glb',
-        background: 'remove'
-      })
+      body: JSON.stringify(requestBody)
     })
 
     if (!createTaskResponse.ok) {
