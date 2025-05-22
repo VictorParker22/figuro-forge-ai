@@ -2,15 +2,17 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
-import { motion } from "framer-motion";
+import VantaBackground from "@/components/VantaBackground";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-figuro-dark">
-      <Header />
-      <Hero />
-      <Features />
-    </div>
+    <VantaBackground>
+      <div className="min-h-screen bg-transparent">
+        <Header />
+        <Hero />
+        <Features />
+      </div>
+    </VantaBackground>
   );
 };
 

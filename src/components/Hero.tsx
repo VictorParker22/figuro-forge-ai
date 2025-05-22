@@ -1,4 +1,3 @@
-
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +7,7 @@ import FiguroMascot from "./FiguroMascot";
 const Hero = () => {
   return (
     <section className="pt-32 pb-20 relative overflow-hidden min-h-screen flex items-center justify-center">
-      <div className="absolute inset-0 bg-figuro-dark pointer-events-none">
-        {/* Subtle gradient lines */}
-        <div className="absolute left-0 right-0 bottom-0 h-1/2 bg-gradient-to-t from-figuro-dark to-transparent opacity-80" />
-        <div className="absolute w-px h-[500px] bg-figuro-accent/10 rotate-12 left-[10%] top-[20%]"></div>
-        <div className="absolute w-px h-[700px] bg-figuro-accent/10 -rotate-12 right-[10%] top-[10%]"></div>
-      </div>
+      {/* Remove the previous background elements since we're using VANTA now */}
       
       <motion.div 
         className="container mx-auto px-4 relative z-10 text-center"
