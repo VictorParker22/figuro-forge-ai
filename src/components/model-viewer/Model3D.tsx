@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Center } from "@react-three/drei";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -15,123 +15,43 @@ const Model3D = ({ url, onError }: Model3DProps) => {
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<THREE.Group | null>(null);
   const { toast } = useToast();
+  
+  // Add refs to track active loaders and prevent duplicate loading
+  const loaderRef = useRef<GLTFLoader | null>(null);
+  const isLoadingRef = useRef<boolean>(false);
+  const prevUrlRef = useRef<string | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    // Don't attempt to load if no URL is provided
     if (!url) return;
     
-    setLoading(true);
-    console.log("Attempting to load model from URL:", url);
-    
-    // For blob URLs, we need special handling
-    if (url.startsWith('blob:')) {
-      try {
-        const loader = new GLTFLoader();
-        
-        loader.load(
-          url,
-          (gltf) => {
-            console.log("Blob URL model loaded successfully:", gltf);
-            setModel(gltf.scene);
-            setLoading(false);
-            toast({
-              title: "Model loaded",
-              description: "Custom 3D model loaded successfully",
-            });
-          },
-          // Progress callback
-          (progress) => {
-            console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
-          },
-          // Error callback
-          (error) => {
-            console.error("Error loading blob URL model:", error);
-            onError(error);
-            setLoading(false);
-          }
-        );
-      } catch (error) {
-        console.error("Error setting up blob URL model loader:", error);
-        onError(error);
-        setLoading(false);
-      }
-      
-      return () => {
-        // Cleanup function for blob URLs
-        if (model) {
-          model.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              const mesh = child as THREE.Mesh;
-              if (mesh.geometry) mesh.geometry.dispose();
-              if (mesh.material) {
-                if (Array.isArray(mesh.material)) {
-                  mesh.material.forEach((material) => material.dispose());
-                } else {
-                  mesh.material.dispose();
-                }
-              }
-            }
-          });
-        }
-      };
+    // Prevent loading the same URL multiple times
+    if (url === prevUrlRef.current && isLoadingRef.current) {
+      console.log("Skipping duplicate load request for:", url);
+      return;
     }
     
-    // For remote URLs, use the original approach
+    console.log("Loading model from URL:", url);
+    prevUrlRef.current = url;
+    
+    // Create new abort controller for this load operation
+    if (controllerRef.current) {
+      console.log("Aborting previous load operation");
+      controllerRef.current.abort();
+    }
+    controllerRef.current = new AbortController();
+    
+    // Set loading state
+    setLoading(true);
+    isLoadingRef.current = true;
+    
+    // Create loader instance
     const loader = new GLTFLoader();
+    loaderRef.current = loader;
     
-    // Try to load the model directly first
-    loader.load(
-      url,
-      (gltf) => {
-        console.log("Model loaded successfully:", gltf);
-        setModel(gltf.scene);
-        setLoading(false);
-        toast({
-          title: "Model loaded",
-          description: "3D model loaded successfully",
-        });
-      },
-      // Progress callback
-      (progress) => {
-        console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
-      },
-      // Error callback
-      (error) => {
-        console.error("Direct loading failed:", error);
-        
-        // If direct loading fails, try with a CORS proxy
-        const proxyUrl = `https://cors-proxy.fringe.zone/${encodeURIComponent(url)}`;
-        console.log("Trying with CORS proxy:", proxyUrl);
-        
-        loader.load(
-          proxyUrl,
-          (gltf) => {
-            console.log("Model loaded successfully with proxy:", gltf);
-            setModel(gltf.scene);
-            setLoading(false);
-            toast({
-              title: "Model loaded",
-              description: "3D model loaded successfully using proxy",
-            });
-          },
-          (progress) => {
-            console.log(`Proxy loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
-          },
-          (proxyError) => {
-            console.error("Proxy loading failed:", proxyError);
-            onError(proxyError);
-            setLoading(false);
-            toast({
-              title: "Loading failed",
-              description: "Failed to load the 3D model. Please try downloading it instead.",
-              variant: "destructive",
-            });
-          }
-        );
-      }
-    );
-    
-    return () => {
-      // Cleanup function
+    // Cleanup function to be called when component unmounts or URL changes
+    const cleanup = () => {
       if (model) {
         model.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
@@ -146,6 +66,162 @@ const Model3D = ({ url, onError }: Model3DProps) => {
             }
           }
         });
+      }
+      isLoadingRef.current = false;
+    };
+    
+    const loadModel = async () => {
+      try {
+        // For blob URLs
+        if (url.startsWith('blob:')) {
+          console.log("Loading blob URL:", url);
+          
+          try {
+            loader.load(
+              url,
+              (gltf) => {
+                if (controllerRef.current?.signal.aborted) {
+                  console.log("Load operation was aborted");
+                  return;
+                }
+                
+                console.log("Blob URL model loaded successfully");
+                setModel(gltf.scene);
+                setLoading(false);
+                isLoadingRef.current = false;
+                toast({
+                  title: "Model loaded",
+                  description: "Custom 3D model loaded successfully",
+                });
+              },
+              // Progress callback
+              (progress) => {
+                if (!controllerRef.current?.signal.aborted) {
+                  console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+                }
+              },
+              // Error callback
+              (error) => {
+                if (controllerRef.current?.signal.aborted) return;
+                
+                console.error("Error loading blob URL model:", error);
+                onError(error);
+                setLoading(false);
+                isLoadingRef.current = false;
+              }
+            );
+          } catch (error) {
+            console.error("Error setting up blob URL model loader:", error);
+            onError(error);
+            setLoading(false);
+            isLoadingRef.current = false;
+          }
+        } else {
+          // For remote URLs, try direct first then fallback to proxy
+          try {
+            console.log("Loading remote URL:", url);
+            
+            // First attempt: Direct loading
+            loader.load(
+              url,
+              (gltf) => {
+                if (controllerRef.current?.signal.aborted) return;
+                
+                console.log("Model loaded successfully");
+                setModel(gltf.scene);
+                setLoading(false);
+                isLoadingRef.current = false;
+                toast({
+                  title: "Model loaded",
+                  description: "3D model loaded successfully",
+                });
+              },
+              // Progress callback
+              (progress) => {
+                if (!controllerRef.current?.signal.aborted) {
+                  console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+                }
+              },
+              // Error callback
+              (error) => {
+                if (controllerRef.current?.signal.aborted) return;
+                
+                console.error("Direct loading failed:", error);
+                
+                // Second attempt: Try with CORS proxy
+                const proxyUrl = `https://cors-proxy.fringe.zone/${encodeURIComponent(url)}`;
+                console.log("Trying with CORS proxy:", proxyUrl);
+                
+                loader.load(
+                  proxyUrl,
+                  (gltf) => {
+                    if (controllerRef.current?.signal.aborted) return;
+                    
+                    console.log("Model loaded successfully with proxy");
+                    setModel(gltf.scene);
+                    setLoading(false);
+                    isLoadingRef.current = false;
+                    toast({
+                      title: "Model loaded",
+                      description: "3D model loaded successfully using proxy",
+                    });
+                  },
+                  (progress) => {
+                    if (!controllerRef.current?.signal.aborted) {
+                      console.log(`Proxy loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+                    }
+                  },
+                  (proxyError) => {
+                    if (controllerRef.current?.signal.aborted) return;
+                    
+                    console.error("Proxy loading failed:", proxyError);
+                    onError(proxyError);
+                    setLoading(false);
+                    isLoadingRef.current = false;
+                    toast({
+                      title: "Loading failed",
+                      description: "Failed to load the 3D model. Please try downloading it instead.",
+                      variant: "destructive",
+                    });
+                  }
+                );
+              }
+            );
+          } catch (error) {
+            console.error("Error in model loading process:", error);
+            onError(error);
+            setLoading(false);
+            isLoadingRef.current = false;
+          }
+        }
+      } catch (error) {
+        console.error("Unexpected error in model loading:", error);
+        onError(error);
+        setLoading(false);
+        isLoadingRef.current = false;
+      }
+    };
+    
+    loadModel();
+    
+    return () => {
+      // Cleanup when component unmounts or URL changes
+      console.log("Cleaning up model loader");
+      cleanup();
+      
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+        controllerRef.current = null;
+      }
+      
+      // Revoke blob URL if it was created in this component
+      if (url.startsWith('blob:') && !url.includes('model-viewer')) {
+        try {
+          URL.revokeObjectURL(url);
+          console.log("Revoked blob URL:", url);
+        } catch (error) {
+          console.error("Error revoking blob URL:", error);
+        }
       }
     };
   }, [url, onError, toast]);

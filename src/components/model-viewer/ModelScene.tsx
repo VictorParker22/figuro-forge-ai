@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Environment } from "@react-three/drei";
 import { Suspense } from "react";
@@ -15,6 +15,20 @@ interface ModelSceneProps {
 }
 
 const ModelScene = ({ modelUrl, autoRotate, onModelError }: ModelSceneProps) => {
+  // Track the current model URL to prevent unnecessary re-renders
+  const currentUrlRef = useRef<string | null>(null);
+  const [stableUrl, setStableUrl] = useState<string | null>(modelUrl);
+  
+  // Stabilize the URL to prevent rapid changes
+  useEffect(() => {
+    // Only update if the URL has actually changed
+    if (modelUrl !== currentUrlRef.current) {
+      console.log("ModelScene: URL changed from", currentUrlRef.current, "to", modelUrl);
+      currentUrlRef.current = modelUrl;
+      setStableUrl(modelUrl);
+    }
+  }, [modelUrl]);
+
   return (
     <Canvas shadows>
       <ambientLight intensity={0.5} />
@@ -22,12 +36,12 @@ const ModelScene = ({ modelUrl, autoRotate, onModelError }: ModelSceneProps) => 
       <PerspectiveCamera makeDefault position={[0, 0, 5]} />
       
       <Suspense fallback={<LoadingSpinner />}>
-        {modelUrl ? (
+        {stableUrl ? (
           <ErrorBoundary 
             fallback={<DummyBox />} 
             onError={onModelError}
           >
-            <Model3D url={modelUrl} onError={onModelError} />
+            <Model3D url={stableUrl} onError={onModelError} />
           </ErrorBoundary>
         ) : (
           <DummyBox />
