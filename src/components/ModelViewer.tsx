@@ -11,17 +11,18 @@ import {
   Html
 } from "@react-three/drei";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
-import { addCorsProxy, tryLoadWithCorsProxies } from "@/utils/corsProxy";
+import { addCorsProxy, tryLoadWithCorsProxies, getOriginalUrl } from "@/utils/corsProxy";
 
 interface ModelViewerProps {
   modelUrl: string | null;
   isLoading: boolean;
   progress?: number;
   errorMessage?: string | null;
+  onCustomModelLoad?: (url: string) => void;
 }
 
 // This component displays a loading spinner inside the 3D canvas
@@ -125,11 +126,20 @@ const DummyBox = () => (
   </mesh>
 );
 
-const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }: ModelViewerProps) => {
+const ModelViewer = ({ 
+  modelUrl, 
+  isLoading, 
+  progress = 0, 
+  errorMessage = null,
+  onCustomModelLoad
+}: ModelViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [modelError, setModelError] = useState<string | null>(null);
   const [modelLoadAttempted, setModelLoadAttempted] = useState(false);
+  const [customFile, setCustomFile] = useState<File | null>(null);
+  const [customModelUrl, setCustomModelUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   // Keep track of original URL for downloads
   const originalUrlRef = useRef<string | null>(modelUrl);
@@ -140,27 +150,77 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
       setModelError(null);
       setModelLoadAttempted(false);
       originalUrlRef.current = modelUrl;
+      // Reset custom model when a new model is provided
+      setCustomModelUrl(null);
+      setCustomFile(null);
     }
   }, [modelUrl]);
 
-  if (!modelUrl && !isLoading) {
+  // Handle file upload click
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle file selection
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Check if file is a GLB format
+    if (!file.name.toLowerCase().endsWith('.glb')) {
+      toast({
+        title: "Invalid file format",
+        description: "Please select a GLB file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCustomFile(file);
+    
+    // Create blob URL for the file
+    const objectUrl = URL.createObjectURL(file);
+    setCustomModelUrl(objectUrl);
+    setModelError(null);
+    setModelLoadAttempted(false);
+    
+    toast({
+      title: "Custom model loaded",
+      description: `${file.name} has been loaded successfully`,
+    });
+    
+    // Call the callback if provided
+    if (onCustomModelLoad) {
+      onCustomModelLoad(objectUrl);
+    }
+  };
+
+  if (!modelUrl && !customModelUrl && !isLoading) {
     return null;
   }
 
   const handleDownload = () => {
-    if (!originalUrlRef.current) return;
+    const downloadUrl = customModelUrl || originalUrlRef.current;
+    if (!downloadUrl) return;
     
     try {
-      // Always use the original URL for downloads, not the proxied version
-      const downloadUrl = originalUrlRef.current;
-      
-      // Create a temporary anchor element
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `figurine-model-${new Date().getTime()}.glb`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // If custom file exists, download it directly
+      if (customFile) {
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = customFile.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        // For generated models, use the original URL for downloads, not the proxied version
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `figurine-model-${new Date().getTime()}.glb`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
       
       toast({
         title: "Download started",
@@ -196,7 +256,12 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
 
   // Determine if we should show an error message
   // Only show error if we don't have a model URL or we tried to load the model and failed
-  const shouldShowError = (errorMessage || modelError) && (!modelUrl || (modelLoadAttempted && modelError));
+  const shouldShowError = (errorMessage || modelError) && 
+    ((!modelUrl && !customModelUrl) || 
+    (modelLoadAttempted && modelError));
+
+  // Determine which URL to use for the 3D model - custom uploaded model takes priority
+  const displayModelUrl = customModelUrl || modelUrl;
 
   return (
     <motion.div
@@ -208,16 +273,35 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
     >
       <div className="p-4 border-b border-white/10 flex justify-between items-center">
         <h3 className="text-lg font-medium">3D Model Preview</h3>
-        {modelUrl && (
-          <Button 
-            variant="outline" 
-            size="sm" 
+        <div className="flex space-x-2">
+          {displayModelUrl && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="border-white/10 hover:border-white/30"
+              onClick={() => setAutoRotate(!autoRotate)}
+            >
+              {autoRotate ? "Stop Rotation" : "Auto Rotate"}
+            </Button>
+          )}
+          
+          <Button
+            variant="outline"
+            size="sm"
             className="border-white/10 hover:border-white/30"
-            onClick={() => setAutoRotate(!autoRotate)}
+            onClick={handleUploadClick}
           >
-            {autoRotate ? "Stop Rotation" : "Auto Rotate"}
+            <Upload size={16} className="mr-1" />
+            Upload Model
           </Button>
-        )}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".glb"
+            className="hidden"
+          />
+        </div>
       </div>
 
       <div className="h-[400px] relative">
@@ -240,13 +324,13 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
           <div className="w-full h-full p-4 flex items-center justify-center text-center">
             <div className="text-red-400">
               <p>{errorMessage || modelError}</p>
-              {modelUrl && (
+              {displayModelUrl && (
                 <p className="text-sm text-green-400 mt-2">
                   A model URL was received. Try downloading it using the button below.
                 </p>
               )}
-              {!modelUrl && (
-                <p className="text-sm text-white/50 mt-2">Try converting the image again</p>
+              {!displayModelUrl && (
+                <p className="text-sm text-white/50 mt-2">Try converting the image again or upload your own GLB file</p>
               )}
             </div>
           </div>
@@ -257,12 +341,12 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
             
             <Suspense fallback={<LoadingSpinner />}>
-              {modelUrl ? (
+              {displayModelUrl ? (
                 <ErrorBoundary 
                   fallback={<DummyBox />} 
                   onError={handleModelError}
                 >
-                  <Model url={modelUrl} onError={handleModelError} />
+                  <Model url={displayModelUrl} onError={handleModelError} />
                 </ErrorBoundary>
               ) : (
                 <DummyBox />
@@ -284,11 +368,11 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
       <div className="p-4 flex justify-center">
         <Button
           className="w-full bg-figuro-accent hover:bg-figuro-accent-hover flex items-center gap-2"
-          disabled={!modelUrl}
+          disabled={!displayModelUrl}
           onClick={handleDownload}
         >
           <Download size={16} />
-          Download 3D Model
+          {customFile ? `Download ${customFile.name}` : "Download 3D Model"}
         </Button>
       </div>
     </motion.div>

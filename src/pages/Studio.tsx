@@ -17,6 +17,7 @@ const Studio = () => {
   const [apiKey, setApiKey] = useState<string | "">("");
   const [showApiInput, setShowApiInput] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [customModelUrl, setCustomModelUrl] = useState<string | null>(null);
   const { toast } = useToast();
   
   const {
@@ -64,8 +65,20 @@ const Studio = () => {
     setShowApiInput(requiresApiKey);
   }, [requiresApiKey]);
 
+  // When a custom model is loaded, reset any conversion process
+  const handleCustomModelLoad = (url: string) => {
+    setCustomModelUrl(url);
+    toast({
+      title: "Custom model loaded",
+      description: "Your custom 3D model has been loaded successfully",
+    });
+  };
+
   // Call directly to handleGenerate instead of trying edge function first
   const onGenerate = async (prompt: string, style: string) => {
+    // Reset custom model when generating a new image
+    setCustomModelUrl(null);
+    
     // Call the handleGenerate function directly
     const result = await handleGenerate(prompt, style, apiKey);
     
@@ -91,6 +104,9 @@ const Studio = () => {
     // For now, we'll just show a toast
     // window.location.href = "/login";
   };
+
+  // Determine which model URL to display - custom or generated
+  const displayModelUrl = customModelUrl || modelUrl;
 
   return (
     <div className="min-h-screen bg-figuro-dark">
@@ -147,6 +163,7 @@ const Studio = () => {
                 isLoading={isConverting}
                 progress={conversionProgress}
                 errorMessage={conversionError}
+                onCustomModelLoad={handleCustomModelLoad}
               />
             </div>
           </div>
