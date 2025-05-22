@@ -1,8 +1,15 @@
 
+# This file controls the behavior of Supabase Edge Functions.
 project_id = "cwjxbwqdfejhmiixoiym"
+
+[functions.convert-to-3d]
+verify_jwt = false
+
+[functions.check-3d-status]
+verify_jwt = false
 
 [functions.generate-image]
 verify_jwt = false
 
-[functions.convert-to-3d]
+[functions.increment]
 verify_jwt = false

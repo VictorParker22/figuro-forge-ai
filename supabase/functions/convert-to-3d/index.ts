@@ -97,85 +97,109 @@ serve(async (req: Request) => {
       throw new Error('No task ID returned from conversion API')
     }
     
-    console.log(`Task created with ID: ${taskId}, starting polling process`)
-    
-    // Step 3: Poll for task status until completion
-    let modelUrl = null
-    let attempts = 0
-    const maxAttempts = 30 // Maximum number of polling attempts
-    const pollingDelay = 2000 // 2 seconds between checks
-    
-    while (attempts < maxAttempts) {
-      attempts++
-      console.log(`Polling for task status: attempt ${attempts}/${maxAttempts}`)
-      
-      // Wait before polling
-      await new Promise(resolve => setTimeout(resolve, pollingDelay))
-      
-      // Check task status using the task ID
-      const statusUrl = `https://api.meshy.ai/openapi/v1/image-to-3d/${taskId}`
-      const statusResponse = await fetch(statusUrl, {
-        headers: {
-          'Authorization': `Bearer ${MESHY_API_KEY}`
-        }
-      })
-      
-      if (!statusResponse.ok) {
-        const errorText = await statusResponse.text()
-        console.error(`Error checking task status: ${errorText}`)
-        if (attempts >= maxAttempts) {
-          throw new Error(`Failed to check task status: ${errorText}`)
-        }
-        continue // Try again if not at max attempts
-      }
-      
-      const statusData = await statusResponse.json()
-      console.log(`Task status response:`, JSON.stringify(statusData))
-      
-      // Check if task is completed and we have a model URL
-      if (statusData.status === 'completed' || statusData.status === 'SUCCESS') {
-        // Try multiple possible fields where the URL might be stored
-        modelUrl = statusData.glb_url || statusData.glbUrl || statusData.model_url
-        if (modelUrl) {
-          console.log(`Task completed successfully. Model URL: ${modelUrl}`)
-          break
-        }
-      } else if (statusData.status === 'failed' || statusData.status === 'FAILED') {
-        throw new Error(`Task failed: ${statusData.message || 'Unknown error'}`)
-      }
-      
-      // If still processing, continue polling
-      console.log(`Task still processing, will check again in ${pollingDelay/1000} seconds`)
-    }
-    
-    // Check if we got a model URL after polling
-    if (!modelUrl) {
-      // Try to extract from the final status response if available
-      if (attempts >= maxAttempts) {
-        throw new Error('Task polling exceeded maximum attempts, no model URL obtained')
-      } else {
-        throw new Error('No model URL returned from conversion API after polling')
-      }
-    }
-
-    // Create Supabase client to update the database with the model URL if needed
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Return the model URL and task info
-    return new Response(
+    // Return the task ID immediately to the client
+    // This way the client can continue and won't time out
+    const responseForClient = new Response(
       JSON.stringify({ 
         success: true, 
-        modelUrl,
         taskId,
-        metadata: {
-          format: 'glb', // Default format
-          attempts: attempts
-        }
+        status: 'processing',
+        message: 'Conversion task started successfully. You can check the status using the taskId.'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
+
+    // Use background processing to continue polling for the task completion
+    // This allows the function to return immediately while processing continues
+    const backgroundProcessing = async () => {
+      console.log(`Task created with ID: ${taskId}, starting polling process`)
+      
+      // Improved polling with extended parameters
+      let modelUrl = null
+      let attempts = 0
+      const maxAttempts = 60 // Increased from 30 to allow for longer processing times
+      const pollingDelay = 5000 // Increased from 2000 ms to reduce API calls and allow more processing time
+      
+      while (attempts < maxAttempts) {
+        attempts++
+        console.log(`Polling for task status: attempt ${attempts}/${maxAttempts}`)
+        
+        // Wait before polling
+        await new Promise(resolve => setTimeout(resolve, pollingDelay))
+        
+        // Check task status using the task ID
+        const statusUrl = `https://api.meshy.ai/openapi/v1/image-to-3d/${taskId}`
+        const statusResponse = await fetch(statusUrl, {
+          headers: {
+            'Authorization': `Bearer ${MESHY_API_KEY}`
+          }
+        })
+        
+        if (!statusResponse.ok) {
+          const errorText = await statusResponse.text()
+          console.error(`Error checking task status: ${errorText}`)
+          if (attempts >= maxAttempts) {
+            console.error(`Task polling exceeded maximum attempts (${maxAttempts}). Last error: ${errorText}`)
+            break
+          }
+          continue // Try again if not at max attempts
+        }
+        
+        const statusData = await statusResponse.json()
+        console.log(`Task status response:`, JSON.stringify(statusData))
+        
+        // Check if task is completed and we have a model URL
+        if (statusData.status === 'completed' || statusData.status === 'SUCCESS' || statusData.status === 'SUCCEEDED') {
+          // FIX: First check in the model_urls object as per the API documentation
+          modelUrl = statusData.model_urls?.glb || 
+                    statusData.glb_url || 
+                    statusData.glbUrl || 
+                    statusData.model_url
+                    
+          if (modelUrl) {
+            console.log(`Task completed successfully. Model URL: ${modelUrl}`)
+            
+            // Create Supabase client to update the database with the model URL
+            const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+            const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+            const supabase = createClient(supabaseUrl, supabaseServiceKey)
+            
+            // Here you could update a database record with the model URL
+            // For example, if you have a table tracking conversion tasks:
+            // await supabase.from('conversion_tasks').update({ model_url: modelUrl, status: 'completed' }).eq('task_id', taskId)
+            
+            console.log("Background processing completed successfully.")
+            break
+          }
+        } else if (statusData.status === 'failed' || statusData.status === 'FAILED') {
+          console.error(`Task failed: ${statusData.task_error?.message || statusData.message || 'Unknown error'}`)
+          break
+        }
+        
+        // If still processing, continue polling
+        const progress = statusData.progress || 0
+        console.log(`Task still processing (${progress}%), will check again in ${pollingDelay/1000} seconds`)
+      }
+      
+      if (!modelUrl && attempts >= maxAttempts) {
+        console.error('Task polling exceeded maximum attempts, no model URL obtained')
+      }
+    }
+    
+    // Start the background processing without awaiting
+    try {
+      EdgeRuntime.waitUntil(backgroundProcessing())
+    } catch (e) {
+      console.warn("EdgeRuntime.waitUntil not supported in this environment:", e)
+      // Fall back to fire-and-forget approach
+      backgroundProcessing().catch(err => {
+        console.error("Error in background processing:", err)
+      })
+    }
+    
+    // Return the immediate response to the client
+    return responseForClient
+
   } catch (error) {
     console.error('Error converting image to 3D:', error)
     return new Response(
@@ -186,4 +210,9 @@ serve(async (req: Request) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
+})
+
+// Add event listener to handle shutdown
+addEventListener('beforeunload', (ev) => {
+  console.log('Function shutdown due to:', ev.detail?.reason)
 })
