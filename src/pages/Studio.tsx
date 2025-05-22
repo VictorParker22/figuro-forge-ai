@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/Header";
@@ -8,6 +7,8 @@ import ModelViewer from "@/components/ModelViewer";
 import Footer from "@/components/Footer";
 import { useToast } from "@/components/ui/use-toast";
 import { Form } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const Studio = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
