@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Canvas } from "@react-three/fiber";
@@ -8,11 +8,14 @@ import {
   PerspectiveCamera, 
   useGLTF, 
   Environment,
-  Center
+  Center,
+  Html
 } from "@react-three/drei";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import * as THREE from "three";
+import { useToast } from "@/hooks/use-toast";
 
 interface ModelViewerProps {
   modelUrl: string | null;
@@ -21,23 +24,60 @@ interface ModelViewerProps {
   errorMessage?: string | null;
 }
 
+// This component displays a loading spinner inside the 3D canvas
+const LoadingSpinner = () => (
+  <Html center>
+    <div className="flex flex-col items-center justify-center">
+      <div className="w-12 h-12 border-4 border-white/20 border-t-figuro-accent rounded-full animate-spin"></div>
+      <p className="mt-4 text-white text-sm">Loading model...</p>
+    </div>
+  </Html>
+);
+
 // This component will load and display the actual 3D model
-const Model = ({ url }: { url: string }) => {
-  const { scene } = useGLTF(url);
+const Model = ({ url, onError }: { url: string; onError: (error: any) => void }) => {
+  const { toast } = useToast();
+  
+  // Use try-catch for handling model loading errors
+  try {
+    // Set a timeout for the model loading
+    const { scene } = useGLTF(url, undefined, undefined, (error) => {
+      console.error("Error loading 3D model:", error);
+      onError(error);
+    });
+    
+    useEffect(() => {
+      // Apply better materials and lighting settings
+      scene.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          if (mesh.material) {
+            // Enhance materials if needed
+            const material = mesh.material as THREE.MeshStandardMaterial;
+            if (material.map) material.map.anisotropy = 16;
+          }
+        }
+      });
+      
+      return () => {
+        // Clean up to avoid memory leaks
+        useGLTF.preload(url);
+      };
+    }, [url, scene]);
 
-  // Log any errors for debugging
-  useEffect(() => {
-    return () => {
-      // Clean up to avoid memory leaks
-      useGLTF.preload(url);
-    };
-  }, [url]);
-
-  return (
-    <Center scale={[1.5, 1.5, 1.5]}>
-      <primitive object={scene} />
-    </Center>
-  );
+    return (
+      <Center scale={[1.5, 1.5, 1.5]}>
+        <primitive object={scene} />
+      </Center>
+    );
+  } catch (error) {
+    // Handle any errors in model loading
+    console.error("Error in Model component:", error);
+    onError(error);
+    
+    // Return an empty fragment
+    return null;
+  }
 };
 
 // Fallback component shown when no model is available
@@ -53,6 +93,7 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
   const [autoRotate, setAutoRotate] = useState(true);
   const [modelError, setModelError] = useState<string | null>(null);
   const [modelLoadAttempted, setModelLoadAttempted] = useState(false);
+  const { toast } = useToast();
 
   // Reset error state when modelUrl changes
   useEffect(() => {
@@ -76,12 +117,27 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    
+    toast({
+      title: "Download started",
+      description: "Your 3D model download has started."
+    });
   };
 
   const handleModelError = (error: any) => {
     console.error("Error loading 3D model:", error);
-    setModelError("Failed to load 3D model. The download may still work.");
+    
+    let errorMsg = "Failed to load 3D model. The download may still work.";
+    
+    // Check for specific CORS or network errors
+    if (error.message && error.message.includes("Failed to fetch")) {
+      errorMsg = "Network error loading 3D model. The model URL might be restricted or unavailable in your browser.";
+    }
+    
+    setModelError(errorMsg);
     setModelLoadAttempted(true);
+    
+    // Don't show a toast for errors that are already displayed in the UI
   };
 
   // Determine if we should show an error message
@@ -110,16 +166,15 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
         )}
       </div>
 
-      <div className="h-[400px]">
+      <div className="h-[400px] relative">
         {isLoading ? (
           <div className="w-full h-full p-4 flex flex-col items-center justify-center">
             <Skeleton className="w-full h-full rounded-lg bg-white/5 loading-shine" />
             {progress > 0 && (
-              <div className="w-full mt-4 px-4">
+              <div className="w-full mt-4 px-4 absolute bottom-4 left-0 right-0">
                 <Progress 
                   value={progress} 
                   className="h-2 bg-white/10" 
-                  indicatorClassName="bg-figuro-accent" 
                 />
                 <p className="text-center text-sm text-white/70 mt-2">
                   {progress < 100 ? `Converting: ${progress}%` : "Finalizing model..."}
@@ -147,19 +202,18 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
             <directionalLight position={[10, 10, 5]} intensity={1} />
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
             
-            {modelUrl ? (
-              // Wrap in error boundary
-              <ErrorBoundary 
-                fallback={<DummyBox />} 
-                onError={(error) => {
-                  handleModelError(error);
-                }}
-              >
-                <Model url={modelUrl} />
-              </ErrorBoundary>
-            ) : (
-              <DummyBox />
-            )}
+            <Suspense fallback={<LoadingSpinner />}>
+              {modelUrl ? (
+                <ErrorBoundary 
+                  fallback={<DummyBox />} 
+                  onError={handleModelError}
+                >
+                  <Model url={modelUrl} onError={handleModelError} />
+                </ErrorBoundary>
+              ) : (
+                <DummyBox />
+              )}
+            </Suspense>
             
             <OrbitControls 
               autoRotate={autoRotate}

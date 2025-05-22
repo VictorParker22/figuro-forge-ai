@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download, Share2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 
 interface ImagePreviewProps {
   imageSrc: string | null;
@@ -20,6 +21,8 @@ const ImagePreview = ({
   isConverting, 
   generationMethod 
 }: ImagePreviewProps) => {
+  const { toast } = useToast();
+  
   if (!imageSrc && !isLoading) {
     return null;
   }
@@ -27,13 +30,27 @@ const ImagePreview = ({
   const handleSaveImage = () => {
     if (!imageSrc) return;
     
-    // Create a temporary anchor element
-    const a = document.createElement('a');
-    a.href = imageSrc;
-    a.download = `figurine-${new Date().getTime()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      // Create a temporary anchor element
+      const a = document.createElement('a');
+      a.href = imageSrc;
+      a.download = `figurine-${new Date().getTime()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Image saved",
+        description: "The image has been saved to your device",
+      });
+    } catch (error) {
+      console.error("Error saving image:", error);
+      toast({
+        title: "Error saving image",
+        description: "There was an error saving the image",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -91,11 +108,21 @@ const ImagePreview = ({
             transition={{ duration: 0.5 }}
             className="w-full h-full p-4"
           >
-            <img
-              src={imageSrc || ''}
-              alt="Generated figurine"
-              className="w-full h-full object-contain rounded-lg"
-            />
+            {imageSrc ? (
+              <img
+                src={imageSrc}
+                alt="Generated figurine"
+                className="w-full h-full object-contain rounded-lg"
+                onError={(e) => {
+                  console.error("Error loading image:", e);
+                  (e.target as HTMLImageElement).src = '/placeholder.svg';
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white/50">
+                No image generated yet
+              </div>
+            )}
           </motion.div>
         )}
       </div>
