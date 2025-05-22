@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -52,16 +53,14 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
-				}
+                figuro: {
+                    dark: "#1A1F2C",
+                    darker: "#151922",
+                    accent: "#9b87f5",
+                    "accent-hover": "#a699f6",
+                    "accent-dark": "#7E69AB",
+                    light: "#D6BCFA"
+                }
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -69,27 +68,42 @@ export default {
 				sm: 'calc(var(--radius) - 4px)'
 			},
 			keyframes: {
-				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+				"accordion-down": {
+					from: { height: "0" },
+					to: { height: "var(--radix-accordion-content-height)" },
 				},
-				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
-				}
+				"accordion-up": {
+					from: { height: "var(--radix-accordion-content-height)" },
+					to: { height: "0" },
+				},
+                "float": {
+                    "0%, 100%": { transform: "translateY(0)" },
+                    "50%": { transform: "translateY(-10px)" },
+                },
+                "glow": {
+                    "0%, 100%": { 
+                        boxShadow: "0 0 5px rgba(155, 135, 245, 0.5), 0 0 20px rgba(155, 135, 245, 0.2)" 
+                    },
+                    "50%": { 
+                        boxShadow: "0 0 10px rgba(155, 135, 245, 0.8), 0 0 30px rgba(155, 135, 245, 0.4)" 
+                    }
+                },
+                "rotate-slow": {
+                    "0%": { transform: "rotateY(0deg)" },
+                    "100%": { transform: "rotateY(360deg)" }
+                }
 			},
 			animation: {
-				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
-			}
+				"accordion-down": "accordion-down 0.2s ease-out",
+				"accordion-up": "accordion-up 0.2s ease-out",
+                "float": "float 6s ease-in-out infinite",
+                "glow": "glow 3s ease-in-out infinite",
+                "rotate-slow": "rotate-slow 20s linear infinite"
+			},
+            boxShadow: {
+                glow: "0 0 10px rgba(155, 135, 245, 0.8), 0 0 30px rgba(155, 135, 245, 0.4)",
+                "glow-sm": "0 0 5px rgba(155, 135, 245, 0.5), 0 0 15px rgba(155, 135, 245, 0.2)"
+            }
 		}
 	},
 	plugins: [require("tailwindcss-animate")],
