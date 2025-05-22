@@ -15,7 +15,9 @@ import { Download, Upload } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+// Import GLTFLoader through drei's exposed version instead of directly from three.js
+// This avoids TypeScript declaration issues
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 interface ModelViewerProps {
   modelUrl: string | null;
