@@ -1,10 +1,9 @@
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Stage } from "@react-three/drei";
-import * as THREE from "three";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download } from "lucide-react";
 
