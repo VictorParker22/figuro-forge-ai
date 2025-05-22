@@ -27,7 +27,7 @@ const Hero = () => {
             animate={{ y: 0 }}
             transition={{ delay: 0.2, duration: 0.8 }}
           >
-            Turn your design into a live web app
+            Create custom 3D figurines with AI
           </motion.h1>
           
           <motion.p 
@@ -36,7 +36,7 @@ const Hero = () => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            Generate, preview, and edit code instantly with Figuro.AI
+            Generate, customize, and 3D print your own figurine designs with Figuro.AI
           </motion.p>
           
           <motion.div
@@ -47,7 +47,7 @@ const Hero = () => {
           >
             <div className="flex rounded-md overflow-hidden bg-white/5 border border-white/10 focus-within:border-white/20">
               <Input 
-                placeholder="Paste your Figma link here"
+                placeholder="Describe your figurine idea..."
                 className="bg-transparent border-0 ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-white/90 flex-1"
               />
               <Button className="bg-figuro-accent hover:bg-figuro-accent-hover rounded-none px-4">
@@ -55,7 +55,7 @@ const Hero = () => {
               </Button>
             </div>
             <p className="text-white/50 text-sm mt-3">
-              Start converting your designs in seconds. No credit card required.
+              Start creating custom figurines in seconds. No credit card required.
             </p>
           </motion.div>
         </div>
