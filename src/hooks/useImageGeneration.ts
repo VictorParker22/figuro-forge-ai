@@ -33,9 +33,10 @@ export const useImageGeneration = () => {
             return;
           }
           
-          // If generation_count exists in the profile, use it
-          const generationCount = profileData.generation_count !== undefined ? 
-            profileData.generation_count : 0;
+          // Use optional chaining and nullish coalescing for type safety
+          const generationCount = profileData && 'generation_count' in profileData 
+            ? (profileData.generation_count as number || 0)
+            : 0;
           
           // Users are allowed 4 generations
           setGenerationsLeft(Math.max(0, 4 - generationCount));
@@ -189,32 +190,39 @@ export const useImageGeneration = () => {
         });
         
         try {
-          // First check if the profile exists and has the generation_count column
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (profileError) {
-            console.error('Error fetching profile:', profileError);
-            return { success: true, needsApiKey: false };
-          }
+          // Update generation count using the RPC function directly
+          const { error: rpcError } = await supabase.rpc('increment', {
+            inc_amount: 1,
+            table_name: 'profiles',
+            column_name: 'generation_count',
+            id: session.user.id 
+          });
           
-          // Try to determine if generation_count exists on the profile
-          if ('generation_count' in profileData) {
-            // Use the rpc increment function if available
-            try {
-              await supabase.rpc('increment', { 
-                table_name: 'profiles',
-                column_name: 'generation_count',
-                id: session.user.id
-              });
-            } catch (rpcError) {
-              // If RPC fails, try direct update
+          if (rpcError) {
+            console.error('Error incrementing generation count via RPC:', rpcError);
+            
+            // Fallback: Use direct update if RPC fails
+            // Get current profile data first to avoid type issues
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+              
+            if (profileData) {
+              // Only try to update if we have generation_count column 
+              // Using type casting to handle the dynamic property
+              const currentCount = profileData.generation_count !== undefined 
+                ? (profileData.generation_count as number) 
+                : 0;
+                
+              // Use a partial update with a type assertion to handle the dynamic property
               await supabase
                 .from('profiles')
-                .update({ generation_count: (profileData.generation_count || 0) + 1 })
+                .update({ 
+                  // Use type assertion to avoid TypeScript errors with dynamic properties
+                  ...(profileData.generation_count !== undefined ? { generation_count: currentCount + 1 } : {})
+                } as any)
                 .eq('id', session.user.id);
             }
           }
@@ -299,3 +307,4 @@ export const useImageGeneration = () => {
     generationsLeft
   };
 };
+

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
@@ -43,10 +42,16 @@ const FigurineGallery = () => {
           
         if (error) throw error;
         
-        // Make sure all required properties exist in the data
+        // Make sure all required properties exist in the data and specifically add saved_image_url if it's missing
         const processedData = (data || []).map(figurine => ({
-          ...figurine,
-          saved_image_url: figurine.saved_image_url || null
+          id: figurine.id,
+          title: figurine.title || "",
+          prompt: figurine.prompt,
+          style: figurine.style,
+          image_url: figurine.image_url || "",
+          saved_image_url: figurine.saved_image_url || null,
+          model_url: figurine.model_url || null,
+          created_at: figurine.created_at || new Date().toISOString()
         }));
         
         setFigurines(processedData);
@@ -161,21 +166,7 @@ const FigurineGallery = () => {
                     className="h-8 w-8 bg-transparent border-white/10"
                     title="View 3D model"
                   >
-                    <svg 
-                      width="14" 
-                      height="14" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round"
-                    >
-                      <path d="m21 16-4 4-4-4" />
-                      <path d="m17 20V4" />
-                      <path d="m3 8 4-4 4 4" />
-                      <path d="M7 4v16" />
-                    </svg>
+                    <Eye size={14} />
                   </Button>
                 )}
               </div>
