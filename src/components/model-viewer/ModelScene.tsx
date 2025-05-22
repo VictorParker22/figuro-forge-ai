@@ -21,13 +21,25 @@ const ModelScene = ({ modelUrl, autoRotate, onModelError }: ModelSceneProps) => 
   
   // Stabilize the URL to prevent rapid changes
   useEffect(() => {
-    // Only update if the URL has actually changed
+    // Only update if the URL has actually changed and is not null
     if (modelUrl !== currentUrlRef.current) {
       console.log("ModelScene: URL changed from", currentUrlRef.current, "to", modelUrl);
       currentUrlRef.current = modelUrl;
-      setStableUrl(modelUrl);
+      
+      // Small delay to ensure stable updates
+      const timer = setTimeout(() => {
+        setStableUrl(modelUrl);
+      }, 50);
+      
+      return () => clearTimeout(timer);
     }
   }, [modelUrl]);
+
+  // Handler for errors in the 3D model
+  const handleModelError = (error: any) => {
+    console.error("ModelScene: Error in 3D model:", error);
+    onModelError(error);
+  };
 
   return (
     <Canvas shadows>
@@ -39,9 +51,9 @@ const ModelScene = ({ modelUrl, autoRotate, onModelError }: ModelSceneProps) => 
         {stableUrl ? (
           <ErrorBoundary 
             fallback={<DummyBox />} 
-            onError={onModelError}
+            onError={handleModelError}
           >
-            <Model3D url={stableUrl} onError={onModelError} />
+            <Model3D url={stableUrl} onError={handleModelError} />
           </ErrorBoundary>
         ) : (
           <DummyBox />

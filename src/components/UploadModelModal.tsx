@@ -14,8 +14,17 @@ interface UploadModelModalProps {
 const UploadModelModal = ({ isOpen, onOpenChange, onModelUpload }: UploadModelModalProps) => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Reset state when modal opens/closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setSelectedFile(null);
+      setIsLoading(false);
+    }
+  }, [isOpen]);
 
   // Handle drag events
   const handleDrag = (e: React.DragEvent) => {
@@ -63,7 +72,18 @@ const UploadModelModal = ({ isOpen, onOpenChange, onModelUpload }: UploadModelMo
       return;
     }
     
+    if (file.size > 100 * 1024 * 1024) { // 100MB limit
+      toast({
+        title: "File too large",
+        description: "Please select a file smaller than 100MB",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setSelectedFile(file);
+    console.log("File selected:", file.name, "size:", (file.size / 1024 / 1024).toFixed(2), "MB");
+    
     toast({
       title: "File selected",
       description: `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`
@@ -72,24 +92,34 @@ const UploadModelModal = ({ isOpen, onOpenChange, onModelUpload }: UploadModelMo
 
   // Upload the model
   const handleUpload = () => {
-    if (!selectedFile) return;
+    if (!selectedFile || isLoading) return;
+    
+    setIsLoading(true);
     
     try {
+      console.log("Creating blob URL for file:", selectedFile.name);
+      
       // Create blob URL for the file
       const objectUrl = URL.createObjectURL(selectedFile);
       console.log("Created blob URL for upload:", objectUrl);
-      onModelUpload(objectUrl, selectedFile);
       
-      toast({
-        title: "Model uploaded",
-        description: `${selectedFile.name} has been loaded successfully`
-      });
-      
-      // Reset selection and close modal
-      setSelectedFile(null);
-      onOpenChange(false);
+      // Small timeout to ensure the blob URL is ready
+      setTimeout(() => {
+        onModelUpload(objectUrl, selectedFile);
+        
+        toast({
+          title: "Model uploaded",
+          description: `${selectedFile.name} has been loaded successfully`
+        });
+        
+        // Reset selection and close modal
+        setSelectedFile(null);
+        setIsLoading(false);
+        onOpenChange(false);
+      }, 100);
     } catch (error) {
       console.error("Upload error:", error);
+      setIsLoading(false);
       toast({
         title: "Upload failed",
         description: "There was an error processing your model",
@@ -99,7 +129,9 @@ const UploadModelModal = ({ isOpen, onOpenChange, onModelUpload }: UploadModelMo
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!isLoading) onOpenChange(open);
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Upload 3D Model</DialogTitle>
@@ -153,15 +185,15 @@ const UploadModelModal = ({ isOpen, onOpenChange, onModelUpload }: UploadModelMo
         </div>
 
         <DialogFooter className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
           <Button 
             className="bg-figuro-accent hover:bg-figuro-accent-hover"
             onClick={handleUpload}
-            disabled={!selectedFile}
+            disabled={!selectedFile || isLoading}
           >
-            Upload Model
+            {isLoading ? "Processing..." : "Upload Model"}
           </Button>
         </DialogFooter>
       </DialogContent>
