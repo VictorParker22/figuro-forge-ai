@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import FiguroMascot from "./FiguroMascot";
 
 const Header = () => {
   return (
@@ -13,7 +14,10 @@ const Header = () => {
     >
       <div className="container mx-auto flex items-center justify-between py-4">
         <div className="flex items-center gap-2">
-          <Link to="/">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="hidden sm:block">
+              <FiguroMascot size={40} />
+            </div>
             <motion.div
               whileHover={{ rotate: 10 }}
               transition={{ type: "spring", stiffness: 400, damping: 10 }}

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight } from "lucide-react";
+import FiguroMascot from "./FiguroMascot";
 
 const Hero = () => {
   return (
@@ -21,6 +22,15 @@ const Hero = () => {
         transition={{ duration: 0.8 }}
       >
         <div className="max-w-4xl mx-auto">
+          <motion.div
+            className="mb-6 mx-auto"
+            initial={{ y: 20, scale: 0.9 }}
+            animate={{ y: 0, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.6 }}
+          >
+            <FiguroMascot className="mx-auto" size={180} />
+          </motion.div>
+          
           <motion.h1 
             className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-white leading-tight"
             initial={{ y: 20 }}
