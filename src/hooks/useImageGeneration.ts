@@ -13,8 +13,8 @@ export const useImageGeneration = () => {
   const [currentFigurineId, setCurrentFigurineId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Generate image using the Edge Function
-  const handleGenerate = async (prompt: string, style: string, apiKey: string = "") => {
+  // Generate image using the Edge Function or directly
+  const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string) => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
     
     setIsGeneratingImage(true);
@@ -23,47 +23,52 @@ export const useImageGeneration = () => {
     setCurrentFigurineId(null);
     
     try {
-      // Call our edge function
-      const response = await fetch(`${window.location.origin}/functions/v1/generate-image`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`
-        },
-        body: JSON.stringify({ 
-          prompt,
-          style,
-          apiKey: savedApiKey
-        }),
-      });
-      
-      // Handle authentication errors
-      if (response.status === 401) {
-        setRequiresApiKey(true);
-        throw new Error("API key required or unauthorized access");
-      }
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `API error: ${response.statusText}`);
-      }
-      
-      // We don't need an API key anymore if we got a successful response
-      setRequiresApiKey(false);
-      
-      // Process the response - if it's JSON with an error, handle it
-      const contentType = response.headers.get("Content-Type") || "";
-      if (contentType.includes("application/json")) {
-        const errorData = await response.json();
-        if (!errorData.success) {
-          throw new Error(errorData.error || "Failed to generate image");
+      // Use the pre-generated image URL if provided
+      if (preGeneratedImageUrl) {
+        setGeneratedImage(preGeneratedImageUrl);
+      } else {
+        // Otherwise call the edge function
+        const response = await fetch(`${window.location.origin}/functions/v1/generate-image`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`
+          },
+          body: JSON.stringify({ 
+            prompt,
+            style,
+            apiKey: savedApiKey
+          }),
+        });
+        
+        // Handle authentication errors
+        if (response.status === 401) {
+          setRequiresApiKey(true);
+          throw new Error("API key required or unauthorized access");
         }
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `API error: ${response.statusText}`);
+        }
+        
+        // We don't need an API key anymore if we got a successful response
+        setRequiresApiKey(false);
+        
+        // Process the response - if it's JSON with an error, handle it
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("application/json")) {
+          const errorData = await response.json();
+          if (!errorData.success) {
+            throw new Error(errorData.error || "Failed to generate image");
+          }
+        }
+        
+        // Otherwise, it's an image, so create a blob URL
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        setGeneratedImage(imageUrl);
       }
-      
-      // Otherwise, it's an image, so create a blob URL
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      setGeneratedImage(imageUrl);
       
       // Save the figurine to Supabase if user is authenticated
       const { data: { session } } = await supabase.auth.getSession();
@@ -78,15 +83,10 @@ export const useImageGeneration = () => {
           user_id: session.user.id,
           prompt: prompt,
           style: style as any, // Match the enum type
-          image_url: imageUrl, // In real app, upload to Supabase Storage
+          image_url: preGeneratedImageUrl || generatedImage, // Use the image URL we have
           title: prompt.substring(0, 50) // Use part of the prompt as title
         });
       }
-      
-      toast({
-        title: "Image generated",
-        description: `Created "${prompt}" in ${style} style`,
-      });
       
       return { success: true, needsApiKey: false };
     } catch (error) {

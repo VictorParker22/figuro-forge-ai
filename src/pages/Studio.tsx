@@ -64,34 +64,76 @@ const Studio = () => {
   // Wrapper for generate function to handle API key checking
   const onGenerate = async (prompt: string, style: string) => {
     try {
-      // First try to use the edge function
-      const edgeResult = await generateImageWithEdge({
-        prompt,
-        style,
-        apiKey: apiKey || undefined
+      // First try to use the edge function with server-side token
+      const response = await fetch(`${window.location.origin}/functions/v1/generate-image`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`
+        },
+        body: JSON.stringify({ 
+          prompt,
+          style,
+          apiKey: apiKey || undefined
+        }),
       });
       
-      if (edgeResult.success && edgeResult.imageUrl) {
-        // Handle successful edge generation
+      // If the server requires an API key or if there's an auth error
+      if (response.status === 401) {
+        const errorData = await response.json();
+        console.log("API key required:", errorData);
+        setShowApiInput(true);
+        return;
+      }
+      
+      if (!response.ok) {
+        // Check if it's a JSON response with error details
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `API error: ${response.statusText}`);
+        }
+        throw new Error(`API error: ${response.statusText}`);
+      }
+      
+      // Process the response - handle both binary image data and JSON
+      const contentType = response.headers.get("Content-Type") || "";
+      
+      if (contentType.includes("image/")) {
+        // It's an image, create a blob URL
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        
+        // Call the handleGenerate function to update the UI state
+        // This avoids duplicate code and ensures the image is saved to Supabase if user is logged in
+        await handleGenerate(prompt, style, apiKey, imageUrl);
+        
         toast({
           title: "Image generated",
           description: `Created "${prompt}" in ${style} style`,
         });
-      } else {
-        // Fall back to the regular generation method
-        const result = await handleGenerate(prompt, style, apiKey);
-        if (result.needsApiKey) {
-          setShowApiInput(true);
+      } else if (contentType.includes("application/json")) {
+        // It's JSON, likely an error
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || "Failed to generate image");
         }
       }
     } catch (error) {
-      // Handle any unexpected errors
       console.error("Generation error:", error);
-      toast({
-        title: "Generation failed",
-        description: error instanceof Error ? error.message : "Failed to generate image",
-        variant: "destructive",
-      });
+      
+      // Fall back to the direct generation method
+      const result = await handleGenerate(prompt, style, apiKey);
+      
+      if (result.needsApiKey) {
+        setShowApiInput(true);
+      } else {
+        toast({
+          title: "Generation failed",
+          description: error instanceof Error ? error.message : "Failed to generate image",
+          variant: "destructive",
+        });
+      }
     }
   };
 

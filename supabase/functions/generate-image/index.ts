@@ -25,13 +25,25 @@ serve(async (req) => {
     // Determine if we should use a specific LoRA adapter
     const useLoraAdapter = style === "isometric" ? "multimodalart/isometric-skeumorphic-3d-bnb" : undefined;
     
-    // Create headers with API key if provided
+    // Create headers with API key if provided or use the Hugging Face token from environment variables
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
     
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
+    // First try to use the provided API key, then fall back to the environment variable
+    const hfToken = apiKey || Deno.env.get("HUGGING_FACE_ACCESS_TOKEN");
+    
+    if (hfToken) {
+      headers["Authorization"] = `Bearer ${hfToken}`;
+    } else {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "No API key provided and no environment token available",
+          needsApiKey: true 
+        }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
     }
     
     // Make the API request
