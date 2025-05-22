@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
@@ -32,7 +33,7 @@ const FigurineGallery = () => {
           
         if (error) throw error;
         
-        // Make sure all required properties exist in the data
+        // Make sure all required properties exist in the data by casting to our Figurine type
         const processedData = (data || []).map(figurine => ({
           id: figurine.id,
           title: figurine.title || "",

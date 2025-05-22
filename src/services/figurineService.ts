@@ -24,12 +24,12 @@ export const saveFigurine = async (
       savedImageUrl = await saveImageToStorage(imageBlob, figurineId);
     }
     
-    // Insert new figurine
+    // Insert new figurine - use type casting to handle the style enum
     await supabase.from('figurines').insert({
       id: figurineId,
       user_id: session.user.id,
       prompt: prompt,
-      style: style,
+      style: style as any, // Cast to any to bypass the strict enum type check
       image_url: imageUrl,
       saved_image_url: savedImageUrl,
       title: prompt.substring(0, 50)

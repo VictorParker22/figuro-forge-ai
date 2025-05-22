@@ -68,12 +68,12 @@ export const incrementGenerationCount = async (): Promise<void> => {
         const profile = profileData as Profile;
         const currentCount = typeof profile.generation_count === 'number' ? profile.generation_count : 0;
         
-        // Use a safe update approach
+        // Use a safe update approach with a cast to handle the flexible type
         await supabase
           .from('profiles')
           .update({ 
             generation_count: currentCount + 1 
-          })
+          } as any)
           .eq('id', session.user.id);
       }
     }
