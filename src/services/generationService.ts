@@ -1,4 +1,3 @@
-
 import { formatStylePrompt } from "@/lib/huggingface";
 import { SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
@@ -18,6 +17,15 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
       }),
     });
     
+    // Handle 404 errors (edge function not deployed)
+    if (response.status === 404) {
+      return { 
+        blob: null, 
+        url: null,
+        error: "Edge function not found. Please make sure the function is deployed."
+      };
+    }
+    
     // Handle authentication errors
     if (response.status === 401) {
       return { 
@@ -28,24 +36,47 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
     }
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `API error: ${response.statusText}`);
+      // Try to get error message from response if it's JSON
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.statusText}`);
+      } catch (jsonError) {
+        // If parsing fails, just use the status text
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
     }
     
-    // Process the response - if it's JSON with an error, handle it
+    // Process the response - check content type first
     const contentType = response.headers.get("Content-Type") || "";
+    
+    // If it's JSON, handle it as JSON
     if (contentType.includes("application/json")) {
-      const errorData = await response.json();
-      if (!errorData.success) {
-        throw new Error(errorData.error || "Failed to generate image");
+      try {
+        const jsonData = await response.json();
+        if (!jsonData.success) {
+          throw new Error(jsonData.error || "Failed to generate image");
+        }
+        
+        // Check if the JSON contains an image URL
+        if (jsonData.url) {
+          return { blob: null, url: jsonData.url };
+        } else {
+          throw new Error("No image data returned");
+        }
+      } catch (jsonError) {
+        throw new Error(`Failed to parse JSON response: ${jsonError.message}`);
       }
     }
     
     // Otherwise, it's an image, so create a blob
-    const imageBlob = await response.blob();
-    const imageUrl = URL.createObjectURL(imageBlob);
-    
-    return { blob: imageBlob, url: imageUrl };
+    try {
+      const imageBlob = await response.blob();
+      const imageUrl = URL.createObjectURL(imageBlob);
+      
+      return { blob: imageBlob, url: imageUrl };
+    } catch (blobError) {
+      throw new Error(`Failed to process image data: ${blobError.message}`);
+    }
   } catch (error) {
     console.error("Generation error:", error);
     return { 
