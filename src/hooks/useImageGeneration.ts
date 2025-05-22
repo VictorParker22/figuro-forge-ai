@@ -13,7 +13,7 @@ export const useImageGeneration = () => {
   const [currentFigurineId, setCurrentFigurineId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Generate image using the Hugging Face API
+  // Generate image using the Edge Function
   const handleGenerate = async (prompt: string, style: string, apiKey: string = "") => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
     
@@ -22,44 +22,45 @@ export const useImageGeneration = () => {
     setModelUrl(null);
     setCurrentFigurineId(null);
     
-    const formattedPrompt = formatStylePrompt(prompt, style);
-    
     try {
-      // Try without API key first if none is provided
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      
-      // Add API key to headers if available
-      if (savedApiKey) {
-        headers["Authorization"] = `Bearer ${savedApiKey}`;
-      }
-      
-      const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev", {
+      // Call our edge function
+      const response = await fetch(`${window.location.origin}/functions/v1/generate-image`, {
         method: "POST",
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`
+        },
         body: JSON.stringify({ 
-          inputs: formattedPrompt,
-          options: {
-            use_lora: true,
-            lora_weights: style === "isometric" ? "multimodalart/isometric-skeumorphic-3d-bnb" : undefined
-          }
+          prompt,
+          style,
+          apiKey: savedApiKey
         }),
       });
       
-      if (response.status === 401 || response.status === 403) {
+      // Handle authentication errors
+      if (response.status === 401) {
         setRequiresApiKey(true);
         throw new Error("API key required or unauthorized access");
       }
       
       if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.statusText}`);
       }
       
-      // If we get here, we don't need an API key anymore
+      // We don't need an API key anymore if we got a successful response
       setRequiresApiKey(false);
       
-      // Convert the response to a blob and create a URL
+      // Process the response - if it's JSON with an error, handle it
+      const contentType = response.headers.get("Content-Type") || "";
+      if (contentType.includes("application/json")) {
+        const errorData = await response.json();
+        if (!errorData.success) {
+          throw new Error(errorData.error || "Failed to generate image");
+        }
+      }
+      
+      // Otherwise, it's an image, so create a blob URL
       const blob = await response.blob();
       const imageUrl = URL.createObjectURL(blob);
       setGeneratedImage(imageUrl);
