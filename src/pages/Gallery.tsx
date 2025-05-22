@@ -10,6 +10,7 @@ import GalleryHeader from "@/components/gallery/GalleryHeader";
 import GalleryGrid from "@/components/gallery/GalleryGrid";
 import ModelViewerDialog from "@/components/gallery/ModelViewerDialog";
 import CallToAction from "@/components/gallery/CallToAction";
+import ModelViewer from "@/components/model-viewer";
 
 // Maximum number of model viewers that can be open at once
 const MAX_ACTIVE_VIEWERS = 1;
