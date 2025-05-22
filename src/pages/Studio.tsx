@@ -10,7 +10,7 @@ import StudioHeader from "@/components/StudioHeader";
 import FigurineGallery from "@/components/FigurineGallery";
 import { useImageGeneration } from "@/hooks/useImageGeneration";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
 const Studio = () => {
@@ -69,7 +69,7 @@ const Studio = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`
+          "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY || ''}`
         },
         body: JSON.stringify({ 
           prompt,

@@ -23,8 +23,8 @@ export const incrementGenerationCount = async (): Promise<void> => {
       id_column: string;
     }
     
-    // Use type assertion with a specific type to fix the TypeScript error
-    const { error: rpcError } = await supabase.rpc<any, any>('increment', {
+    // Use the correct type assertion to fix the TypeScript error
+    const { error: rpcError } = await supabase.rpc('increment', {
       inc_amount: 1,
       table_name: 'profiles',
       column_name: 'generation_count',

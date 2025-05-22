@@ -1,4 +1,6 @@
+
 import { formatStylePrompt } from "@/lib/huggingface";
+import { SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 // Generate image using edge function
 export const generateImage = async (prompt: string, style: string, apiKey: string = ""): Promise<{blob: Blob | null, url: string | null, error?: string}> => {
@@ -7,7 +9,7 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`
+        "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY || ''}`
       },
       body: JSON.stringify({ 
         prompt,
