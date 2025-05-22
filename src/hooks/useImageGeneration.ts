@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { incrementGenerationCount } from "@/services/profileService";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
 
@@ -64,8 +63,7 @@ export const useImageGeneration = () => {
         if (figurineId) {
           setCurrentFigurineId(figurineId);
           
-          // Update the generation count
-          await incrementGenerationCount();
+          // Removed the incrementGenerationCount call
         }
       }
       
