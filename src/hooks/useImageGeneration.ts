@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
-import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
