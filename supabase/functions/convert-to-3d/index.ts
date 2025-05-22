@@ -50,7 +50,7 @@ serve(async (req: Request) => {
 
     console.log("Creating 3D conversion request...")
     
-    // Prepare the request payload
+    // Step 1: Prepare the request payload and initiate the conversion
     const requestPayload: any = {
       outputFormat: 'glb',
       enable_pbr: true,
@@ -69,7 +69,7 @@ serve(async (req: Request) => {
       requestPayload.image_url = imageUrl
     }
 
-    // Using the v1 OpenAPI endpoint for a simpler, direct conversion
+    // Using the v1 OpenAPI endpoint for conversion
     const response = await fetch('https://api.meshy.ai/openapi/v1/image-to-3d', {
       method: 'POST',
       headers: {
@@ -86,15 +86,76 @@ serve(async (req: Request) => {
     }
 
     // Parse the response from Meshy API
-    const result = await response.json()
+    const initialResult = await response.json()
+    console.log("Initial API response:", JSON.stringify(initialResult))
     
-    console.log("3D conversion succeeded, result:", JSON.stringify(result))
+    // Step 2: Extract the task ID from the response
+    const taskId = initialResult.result || initialResult.id
     
-    // Get the model URL from the response
-    const modelUrl = result.glb_url || result.glbUrl || result.model_url
+    if (!taskId) {
+      console.error("No task ID found in response:", initialResult)
+      throw new Error('No task ID returned from conversion API')
+    }
     
+    console.log(`Task created with ID: ${taskId}, starting polling process`)
+    
+    // Step 3: Poll for task status until completion
+    let modelUrl = null
+    let attempts = 0
+    const maxAttempts = 30 // Maximum number of polling attempts
+    const pollingDelay = 2000 // 2 seconds between checks
+    
+    while (attempts < maxAttempts) {
+      attempts++
+      console.log(`Polling for task status: attempt ${attempts}/${maxAttempts}`)
+      
+      // Wait before polling
+      await new Promise(resolve => setTimeout(resolve, pollingDelay))
+      
+      // Check task status using the task ID
+      const statusUrl = `https://api.meshy.ai/openapi/v1/image-to-3d/${taskId}`
+      const statusResponse = await fetch(statusUrl, {
+        headers: {
+          'Authorization': `Bearer ${MESHY_API_KEY}`
+        }
+      })
+      
+      if (!statusResponse.ok) {
+        const errorText = await statusResponse.text()
+        console.error(`Error checking task status: ${errorText}`)
+        if (attempts >= maxAttempts) {
+          throw new Error(`Failed to check task status: ${errorText}`)
+        }
+        continue // Try again if not at max attempts
+      }
+      
+      const statusData = await statusResponse.json()
+      console.log(`Task status response:`, JSON.stringify(statusData))
+      
+      // Check if task is completed and we have a model URL
+      if (statusData.status === 'completed' || statusData.status === 'SUCCESS') {
+        // Try multiple possible fields where the URL might be stored
+        modelUrl = statusData.glb_url || statusData.glbUrl || statusData.model_url
+        if (modelUrl) {
+          console.log(`Task completed successfully. Model URL: ${modelUrl}`)
+          break
+        }
+      } else if (statusData.status === 'failed' || statusData.status === 'FAILED') {
+        throw new Error(`Task failed: ${statusData.message || 'Unknown error'}`)
+      }
+      
+      // If still processing, continue polling
+      console.log(`Task still processing, will check again in ${pollingDelay/1000} seconds`)
+    }
+    
+    // Check if we got a model URL after polling
     if (!modelUrl) {
-      throw new Error('No model URL returned from conversion API')
+      // Try to extract from the final status response if available
+      if (attempts >= maxAttempts) {
+        throw new Error('Task polling exceeded maximum attempts, no model URL obtained')
+      } else {
+        throw new Error('No model URL returned from conversion API after polling')
+      }
     }
 
     // Create Supabase client to update the database with the model URL if needed
@@ -102,16 +163,15 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Return the model URL
+    // Return the model URL and task info
     return new Response(
       JSON.stringify({ 
         success: true, 
         modelUrl,
-        // Include additional metadata if available in the response
+        taskId,
         metadata: {
-          format: result.format || 'glb',
-          fileSize: result.file_size || null,
-          conversionId: result.id || null
+          format: 'glb', // Default format
+          attempts: attempts
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
