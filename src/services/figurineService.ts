@@ -13,7 +13,7 @@ export const saveFigurine = async (
 ): Promise<string | null> => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return null;
+    const userId = session?.user?.id || null;
     
     // Generate a new ID for the figurine
     const figurineId = uuidv4();
@@ -24,16 +24,20 @@ export const saveFigurine = async (
       savedImageUrl = await saveImageToStorage(imageBlob, figurineId);
     }
     
-    // Insert new figurine - use type casting to handle the style enum
-    await supabase.from('figurines').insert({
+    // Create figurine data object
+    const figurineData = {
       id: figurineId,
-      user_id: session.user.id,
+      user_id: userId,
       prompt: prompt,
       style: style as any, // Cast to any to bypass the strict enum type check
       image_url: imageUrl,
       saved_image_url: savedImageUrl,
-      title: prompt.substring(0, 50)
-    });
+      title: prompt.substring(0, 50),
+      is_public: true // Set all figurines as public by default
+    };
+    
+    // Insert new figurine
+    await supabase.from('figurines').insert(figurineData);
     
     return figurineId;
   } catch (error) {
@@ -45,13 +49,28 @@ export const saveFigurine = async (
 // Update an existing figurine with a model URL
 export const updateFigurineWithModelUrl = async (figurineId: string, modelUrl: string): Promise<void> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-    
     await supabase.from('figurines').update({
       model_url: modelUrl
     }).eq('id', figurineId);
   } catch (error) {
     console.error('Error updating figurine with model URL:', error);
+  }
+};
+
+// Fetch all public figurines for the gallery
+export const fetchPublicFigurines = async (): Promise<Figurine[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('figurines')
+      .select('*')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching public figurines:', error);
+    return [];
   }
 };
