@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
@@ -13,7 +13,19 @@ export const useImageGeneration = () => {
   const [requiresApiKey, setRequiresApiKey] = useState(false);
   const [currentFigurineId, setCurrentFigurineId] = useState<string | null>(null);
   const [generationMethod, setGenerationMethod] = useState<"edge" | "direct" | null>(null);
+  const [conversionProgress, setConversionProgress] = useState(0);
+  const [conversionError, setConversionError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const { toast } = useToast();
+
+  // Clean up event source on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   // Helper function to convert image to base64
   const imageUrlToBase64 = async (imageUrl: string): Promise<string | null> => {
@@ -40,6 +52,154 @@ export const useImageGeneration = () => {
     }
   };
 
+  // Set up SSE connection for real-time updates on conversion
+  const setupSSEConnection = (taskId: string) => {
+    // Close any existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    
+    const sseUrl = `${SUPABASE_URL}/functions/v1/check-3d-status?taskId=${taskId}&sse=true`;
+    console.log(`Setting up SSE connection to: ${sseUrl}`);
+
+    const eventSource = new EventSource(sseUrl);
+    eventSourceRef.current = eventSource;
+
+    // Handle connection open
+    eventSource.onopen = () => {
+      console.log('SSE connection established');
+    };
+
+    // Handle connection error
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
+      eventSource.close();
+      eventSourceRef.current = null;
+    };
+
+    // Handle general messages
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('SSE message received:', data);
+        
+        // Update progress if available
+        if (data.progress !== undefined) {
+          setConversionProgress(data.progress);
+        }
+      } catch (error) {
+        console.error('Error parsing SSE message:', error);
+      }
+    };
+
+    // Handle specific events
+    eventSource.addEventListener('connected', (event: any) => {
+      console.log('SSE connected event:', event.data ? JSON.parse(event.data) : event);
+    });
+
+    eventSource.addEventListener('status', (event: any) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('SSE status update:', data);
+        
+        // Update progress
+        if (data.progress !== undefined) {
+          setConversionProgress(data.progress);
+        }
+      } catch (error) {
+        console.error('Error parsing SSE status:', error);
+      }
+    });
+
+    eventSource.addEventListener('processing', (event: any) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('SSE processing update:', data);
+        setConversionProgress(data.progress || 0);
+      } catch (error) {
+        console.error('Error parsing SSE processing event:', error);
+      }
+    });
+
+    eventSource.addEventListener('completed', (event: any) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('SSE completed event:', data);
+        
+        // Handle completion
+        if (data.modelUrl) {
+          setModelUrl(data.modelUrl);
+          setIsConverting(false);
+          setConversionProgress(100);
+          
+          toast({
+            title: "3D model created",
+            description: "Your figurine is ready to view in 3D",
+          });
+          
+          // Update figurine with model URL if we have one
+          if (currentFigurineId) {
+            updateFigurineWithModelUrl(currentFigurineId, data.modelUrl);
+          }
+          
+          // Close the connection as we're done
+          eventSource.close();
+          eventSourceRef.current = null;
+        }
+      } catch (error) {
+        console.error('Error parsing SSE completed event:', error);
+      }
+    });
+
+    eventSource.addEventListener('failed', (event: any) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.error('SSE failure event:', data);
+        
+        const errorMessage = data.error || data.details || 'Conversion failed';
+        setConversionError(errorMessage);
+        setIsConverting(false);
+        
+        toast({
+          title: "Conversion failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        
+        // Close the connection as we're done
+        eventSource.close();
+        eventSourceRef.current = null;
+      } catch (error) {
+        console.error('Error parsing SSE failed event:', error);
+      }
+    });
+
+    eventSource.addEventListener('error', (event: any) => {
+      try {
+        const data = event.data ? JSON.parse(event.data) : { error: 'Unknown error' };
+        console.error('SSE error event:', data);
+        
+        const errorMessage = data.error || data.details || 'Error during conversion';
+        setConversionError(errorMessage);
+        setIsConverting(false);
+        
+        toast({
+          title: "Conversion error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        
+        // Close the connection as we're done
+        eventSource.close();
+        eventSourceRef.current = null;
+      } catch (error) {
+        console.error('Error parsing SSE error event:', error);
+      }
+    });
+
+    return eventSource;
+  };
+
   // Generate image using a single generation attempt strategy
   const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string) => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
@@ -49,6 +209,8 @@ export const useImageGeneration = () => {
     setModelUrl(null);
     setCurrentFigurineId(null);
     setGenerationMethod(null);
+    setConversionProgress(0);
+    setConversionError(null);
     
     try {
       let imageUrl: string | null = null;
@@ -118,7 +280,7 @@ export const useImageGeneration = () => {
     }
   };
 
-  // Convert image to 3D model using Meshy.ai API
+  // Convert image to 3D model using Meshy.ai API with webhook and SSE
   const handleConvertTo3D = async () => {
     if (!generatedImage) {
       toast({
@@ -130,6 +292,9 @@ export const useImageGeneration = () => {
     }
 
     setIsConverting(true);
+    setConversionProgress(0);
+    setConversionError(null);
+    setModelUrl(null);
     
     try {
       // Check if the image URL is a blob URL
@@ -181,31 +346,103 @@ export const useImageGeneration = () => {
       
       const data = await response.json();
       
-      if (!data.modelUrl) {
-        throw new Error("No model URL returned from conversion service");
+      if (!data.taskId) {
+        throw new Error("No task ID returned from conversion service");
       }
       
-      // Set the model URL in state
-      setModelUrl(data.modelUrl);
-      
-      // Update figurine with model URL if we have one
-      if (currentFigurineId) {
-        await updateFigurineWithModelUrl(currentFigurineId, data.modelUrl);
-      }
-      
+      console.log("Conversion task started with ID:", data.taskId);
       toast({
-        title: "3D model created",
-        description: "Your figurine is ready to view in 3D",
+        title: "3D conversion started",
+        description: "Your 3D model is being created. You'll see real-time updates.",
       });
+      
+      // Set up SSE connection for real-time updates
+      setupSSEConnection(data.taskId);
+      
+      // Start checking status periodically as a backup to SSE
+      const checkStatus = async (taskId: string, maxAttempts = 60, delay = 5000) => {
+        let attempts = 0;
+        
+        const checkInterval = setInterval(async () => {
+          if (attempts >= maxAttempts || modelUrl !== null) {
+            clearInterval(checkInterval);
+            return;
+          }
+          
+          attempts++;
+          try {
+            const statusResponse = await fetch(`${SUPABASE_URL}/functions/v1/check-3d-status?taskId=${taskId}`, {
+              headers: {
+                "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+              }
+            });
+            
+            if (!statusResponse.ok) {
+              console.error(`Error checking status (attempt ${attempts}):`, statusResponse.status);
+              return;
+            }
+            
+            const statusData = await statusResponse.json();
+            console.log(`Status check (attempt ${attempts}):`, statusData);
+            
+            // Update progress
+            if (statusData.progress !== undefined) {
+              setConversionProgress(statusData.progress);
+            }
+            
+            // Check if completed
+            if (statusData.modelUrl) {
+              clearInterval(checkInterval);
+              
+              // Don't set the model URL if SSE has already done it
+              if (!modelUrl) {
+                setModelUrl(statusData.modelUrl);
+                
+                toast({
+                  title: "3D model created",
+                  description: "Your figurine is ready to view in 3D",
+                });
+                
+                // Update figurine with model URL if we have one
+                if (currentFigurineId) {
+                  await updateFigurineWithModelUrl(currentFigurineId, statusData.modelUrl);
+                }
+              }
+              
+              setIsConverting(false);
+            } else if (statusData.error) {
+              clearInterval(checkInterval);
+              setConversionError(statusData.error);
+              setIsConverting(false);
+              
+              toast({
+                title: "Conversion failed",
+                description: statusData.error,
+                variant: "destructive",
+              });
+            }
+          } catch (error) {
+            console.error(`Error checking status (attempt ${attempts}):`, error);
+          }
+        }, delay);
+        
+        // Clean up the interval on unmount
+        return () => clearInterval(checkInterval);
+      };
+      
+      // Start the backup status check
+      checkStatus(data.taskId);
+      
     } catch (error) {
       console.error("Conversion error:", error);
+      setConversionError(error instanceof Error ? error.message : "Unknown error");
+      setIsConverting(false);
+      
       toast({
         title: "Conversion failed",
         description: error instanceof Error ? error.message : "Failed to convert to 3D model",
         variant: "destructive",
       });
-    } finally {
-      setIsConverting(false);
     }
   };
 
@@ -218,6 +455,8 @@ export const useImageGeneration = () => {
     handleConvertTo3D,
     requiresApiKey,
     currentFigurineId,
-    generationMethod
+    generationMethod,
+    conversionProgress,
+    conversionError
   };
 };

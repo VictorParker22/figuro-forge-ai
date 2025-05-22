@@ -12,10 +12,13 @@ import {
 } from "@react-three/drei";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface ModelViewerProps {
   modelUrl: string | null;
   isLoading: boolean;
+  progress?: number;
+  errorMessage?: string | null;
 }
 
 // This component will load and display the actual 3D model
@@ -45,7 +48,7 @@ const DummyBox = () => (
   </mesh>
 );
 
-const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
+const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }: ModelViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [modelError, setModelError] = useState<string | null>(null);
@@ -86,25 +89,39 @@ const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
     >
       <div className="p-4 border-b border-white/10 flex justify-between items-center">
         <h3 className="text-lg font-medium">3D Model Preview</h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="border-white/10 hover:border-white/30"
-          onClick={() => setAutoRotate(!autoRotate)}
-        >
-          {autoRotate ? "Stop Rotation" : "Auto Rotate"}
-        </Button>
+        {modelUrl && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-white/10 hover:border-white/30"
+            onClick={() => setAutoRotate(!autoRotate)}
+          >
+            {autoRotate ? "Stop Rotation" : "Auto Rotate"}
+          </Button>
+        )}
       </div>
 
       <div className="h-[400px]">
         {isLoading ? (
-          <div className="w-full h-full p-4 flex items-center justify-center">
+          <div className="w-full h-full p-4 flex flex-col items-center justify-center">
             <Skeleton className="w-full h-full rounded-lg bg-white/5 loading-shine" />
+            {progress > 0 && (
+              <div className="w-full mt-4 px-4">
+                <Progress 
+                  value={progress} 
+                  className="h-2 bg-white/10" 
+                  indicatorClassName="bg-figuro-accent" 
+                />
+                <p className="text-center text-sm text-white/70 mt-2">
+                  {progress < 100 ? `Converting: ${progress}%` : "Finalizing model..."}
+                </p>
+              </div>
+            )}
           </div>
-        ) : modelError ? (
+        ) : errorMessage || modelError ? (
           <div className="w-full h-full p-4 flex items-center justify-center text-center">
             <div className="text-red-400">
-              <p>{modelError}</p>
+              <p>{errorMessage || modelError}</p>
               <p className="text-sm text-white/50 mt-2">Try converting the image again</p>
             </div>
           </div>

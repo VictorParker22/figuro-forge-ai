@@ -27,7 +27,9 @@ const Studio = () => {
     handleGenerate,
     handleConvertTo3D,
     requiresApiKey,
-    generationMethod
+    generationMethod,
+    conversionProgress,
+    conversionError
   } = useImageGeneration();
 
   // Check for authenticated user
@@ -140,7 +142,12 @@ const Studio = () => {
             </div>
             
             <div>
-              <ModelViewer modelUrl={modelUrl} isLoading={isConverting} />
+              <ModelViewer 
+                modelUrl={modelUrl} 
+                isLoading={isConverting}
+                progress={conversionProgress}
+                errorMessage={conversionError}
+              />
             </div>
           </div>
           
