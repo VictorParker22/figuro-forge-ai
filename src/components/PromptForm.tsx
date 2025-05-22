@@ -24,7 +24,7 @@ interface PromptFormProps {
 
 const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
   const [prompt, setPrompt] = useState("");
-  const [style, setStyle] = useState("isometric");
+  const [style, setStyle] = useState("isometric"); // Isometric is already the default
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +59,7 @@ const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
               onChange={(e) => setPrompt(e.target.value)}
             />
             <p className="text-xs text-white/50">
-              Describe the subject you want for your figurine. The style settings below will be applied automatically.
+              Describe the subject you want for your figurine. Isometric style will be applied by default.
             </p>
           </div>
           
@@ -91,7 +91,7 @@ const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
         </form>
       </motion.div>
       
-      {style === "isometric" && <ExamplePrompts onSelectPrompt={handleExampleSelect} />}
+      <ExamplePrompts onSelectPrompt={handleExampleSelect} />
     </div>
   );
 };

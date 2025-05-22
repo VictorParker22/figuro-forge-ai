@@ -56,7 +56,7 @@ const ExamplePrompts = ({ onSelectPrompt }: ExamplePromptsProps) => {
         ))}
       </div>
       <p className="text-xs text-white/50 mt-3">
-        Click any example to use it as your prompt. The isometric style will be applied automatically.
+        Click any example to use it as your prompt. The current style will be applied automatically.
       </p>
     </motion.div>
   );
