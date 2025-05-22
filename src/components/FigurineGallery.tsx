@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Eye, Download, Cube } from 'lucide-react';
+import { Eye, Download } from 'lucide-react';
 
 interface Figurine {
   id: string;
@@ -43,7 +43,13 @@ const FigurineGallery = () => {
           
         if (error) throw error;
         
-        setFigurines(data || []);
+        // Make sure all required properties exist in the data
+        const processedData = (data || []).map(figurine => ({
+          ...figurine,
+          saved_image_url: figurine.saved_image_url || null
+        }));
+        
+        setFigurines(processedData);
       } catch (err) {
         console.error('Error fetching figurines:', err);
         setError('Failed to load your figurines');
@@ -155,7 +161,21 @@ const FigurineGallery = () => {
                     className="h-8 w-8 bg-transparent border-white/10"
                     title="View 3D model"
                   >
-                    <Cube size={14} />
+                    <svg 
+                      width="14" 
+                      height="14" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    >
+                      <path d="m21 16-4 4-4-4" />
+                      <path d="m17 20V4" />
+                      <path d="m3 8 4-4 4 4" />
+                      <path d="M7 4v16" />
+                    </svg>
                   </Button>
                 )}
               </div>

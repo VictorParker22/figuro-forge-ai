@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { formatStylePrompt } from "@/lib/huggingface";
@@ -19,15 +20,29 @@ export const useImageGeneration = () => {
     const checkRemainingGenerations = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('generation_count')
-          .eq('id', session.user.id)
-          .single();
+        try {
+          // First check if the generation_count column exists
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profileError) {
+            console.error('Error fetching profile:', profileError);
+            return;
+          }
           
-        if (data) {
+          // If generation_count exists in the profile, use it
+          const generationCount = profileData.generation_count !== undefined ? 
+            profileData.generation_count : 0;
+          
           // Users are allowed 4 generations
-          setGenerationsLeft(Math.max(0, 4 - data.generation_count));
+          setGenerationsLeft(Math.max(0, 4 - generationCount));
+        } catch (err) {
+          console.error('Error checking generations:', err);
+          // Default to allowing generations if we can't check
+          setGenerationsLeft(4);
         }
       }
     };
@@ -173,14 +188,43 @@ export const useImageGeneration = () => {
           title: prompt.substring(0, 50)
         });
         
-        // Update generation count
-        await supabase.from('profiles')
-          .update({ generation_count: supabase.rpc('increment', { inc_amount: 1 }) })
-          .eq('id', session.user.id);
-        
-        // Update generations left
-        if (generationsLeft !== null) {
-          setGenerationsLeft(Math.max(0, generationsLeft - 1));
+        try {
+          // First check if the profile exists and has the generation_count column
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profileError) {
+            console.error('Error fetching profile:', profileError);
+            return { success: true, needsApiKey: false };
+          }
+          
+          // Try to determine if generation_count exists on the profile
+          if ('generation_count' in profileData) {
+            // Use the rpc increment function if available
+            try {
+              await supabase.rpc('increment', { 
+                table_name: 'profiles',
+                column_name: 'generation_count',
+                id: session.user.id
+              });
+            } catch (rpcError) {
+              // If RPC fails, try direct update
+              await supabase
+                .from('profiles')
+                .update({ generation_count: (profileData.generation_count || 0) + 1 })
+                .eq('id', session.user.id);
+            }
+          }
+          
+          // Update generations left
+          if (generationsLeft !== null) {
+            setGenerationsLeft(Math.max(0, generationsLeft - 1));
+          }
+        } catch (error) {
+          console.error('Error updating generation count:', error);
         }
       }
       
