@@ -21,12 +21,15 @@ export const addCorsProxy = (url: string, proxyIndex: number = 0): string => {
   
   // Don't add a proxy for blob URLs or data URLs
   if (url.startsWith('blob:') || url.startsWith('data:')) {
+    console.log("Skipping proxy for blob or data URL:", url);
     return url;
   }
   
   // Ensure proxy index is valid
   const validIndex = Math.max(0, Math.min(proxyIndex, CORS_PROXIES.length - 1));
-  return `${CORS_PROXIES[validIndex]}${encodeURIComponent(url)}`;
+  const proxiedUrl = `${CORS_PROXIES[validIndex]}${encodeURIComponent(url)}`;
+  console.log(`Adding CORS proxy (${validIndex}):`, proxiedUrl);
+  return proxiedUrl;
 };
 
 /**
@@ -73,6 +76,13 @@ export const tryLoadWithCorsProxies = async (
 ): Promise<void> => {
   if (!url) {
     onError(new Error("No URL provided"));
+    return;
+  }
+
+  // Skip proxies for blob URLs - pass them through directly
+  if (url.startsWith('blob:')) {
+    console.log("Direct access for blob URL:", url);
+    onSuccess(url);
     return;
   }
 

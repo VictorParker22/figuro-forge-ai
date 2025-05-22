@@ -159,7 +159,7 @@ const Studio = () => {
             
             <div>
               <ModelViewer 
-                modelUrl={modelUrl} 
+                modelUrl={displayModelUrl} 
                 isLoading={isConverting}
                 progress={conversionProgress}
                 errorMessage={conversionError}
@@ -185,3 +185,4 @@ const Studio = () => {
 };
 
 export default Studio;
+

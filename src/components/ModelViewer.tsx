@@ -5,17 +5,17 @@ import { Canvas } from "@react-three/fiber";
 import { 
   OrbitControls, 
   PerspectiveCamera, 
-  useGLTF, 
   Environment,
   Center,
-  Html
+  Html,
+  useGLTF
 } from "@react-three/drei";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download, Upload } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
-import { addCorsProxy, tryLoadWithCorsProxies, getOriginalUrl } from "@/utils/corsProxy";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 
 interface ModelViewerProps {
   modelUrl: string | null;
@@ -37,85 +37,115 @@ const LoadingSpinner = () => (
 
 // This component will load and display the actual 3D model
 const Model = ({ url, onError }: { url: string; onError: (error: any) => void }) => {
-  const [modelUrl, setModelUrl] = useState(url);
-  const [proxyAttempts, setProxyAttempts] = useState(0);
-  const [isUsingProxy, setIsUsingProxy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // First try with the original URL, then try with proxies if that fails
-    tryLoadWithCorsProxies(
-      url,
-      (loadedUrl) => {
-        setModelUrl(loadedUrl);
-        setIsUsingProxy(loadedUrl !== url);
-        if (loadedUrl !== url) {
-          console.log(`Successfully loaded model using CORS proxy: ${loadedUrl !== url ? 'Yes' : 'No'}`);
-        }
-      },
-      (error) => {
-        console.error("All loading attempts failed:", error);
-        onError(error);
-      }
-    );
-  }, [url, onError]);
-
-  try {
-    // Set a timeout for the model loading
-    const { scene } = useGLTF(modelUrl, undefined, undefined, (error) => {
-      console.error("Error loading 3D model:", error);
-      
-      // If we failed but haven't tried proxies yet, try with a proxy now
-      if (proxyAttempts < 2 && !isUsingProxy) {
-        const nextProxyIndex = proxyAttempts;
-        const proxiedUrl = addCorsProxy(url, nextProxyIndex);
-        console.log(`Trying with proxy ${nextProxyIndex}:`, proxiedUrl);
-        
-        setProxyAttempts(prev => prev + 1);
-        setModelUrl(proxiedUrl);
-        setIsUsingProxy(true);
-      } else {
-        // We've tried everything, pass the error up
-        onError(error);
-      }
-    });
-    
-    useEffect(() => {
-      // Apply better materials and lighting settings
-      scene.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          const mesh = child as THREE.Mesh;
-          if (mesh.material) {
-            // Enhance materials if needed
-            const material = mesh.material as THREE.MeshStandardMaterial;
-            if (material.map) material.map.anisotropy = 16;
-          }
-        }
-      });
-      
-      return () => {
-        try {
-          // Clean up to avoid memory leaks
-          useGLTF.preload(modelUrl);
-        } catch (e) {
-          console.log("Cleanup error:", e);
-        }
-      };
-    }, [modelUrl, scene]);
-
-    return (
-      <Center scale={[1.5, 1.5, 1.5]}>
-        <primitive object={scene} />
-      </Center>
-    );
-  } catch (error) {
-    // Handle any errors in model loading
-    console.error("Error in Model component:", error);
-    onError(error);
-    
-    // Return an empty fragment
-    return null;
+  
+  // For blob URLs, we'll use useGLTF directly
+  if (url.startsWith('blob:')) {
+    try {
+      const { scene } = useGLTF(url);
+      return (
+        <Center scale={[1.5, 1.5, 1.5]}>
+          <primitive object={scene} />
+        </Center>
+      );
+    } catch (error) {
+      console.error("Error loading blob URL model:", error);
+      onError(error);
+      return null;
+    }
   }
+  
+  // For remote URLs, we'll use GLTFLoader with proper error handling
+  const [model, setModel] = useState<THREE.Group | null>(null);
+  
+  useEffect(() => {
+    setLoading(true);
+    const loader = new GLTFLoader();
+    
+    console.log("Attempting to load model from URL:", url);
+    
+    // Try to load the model directly first
+    loader.load(
+      url,
+      (gltf) => {
+        console.log("Model loaded successfully:", gltf);
+        setModel(gltf.scene);
+        setLoading(false);
+        toast({
+          title: "Model loaded",
+          description: "3D model loaded successfully",
+        });
+      },
+      // Progress callback
+      (progress) => {
+        console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+      },
+      // Error callback
+      (error) => {
+        console.error("Direct loading failed:", error);
+        
+        // If direct loading fails, try with a CORS proxy
+        const proxyUrl = `https://cors-proxy.fringe.zone/${encodeURIComponent(url)}`;
+        console.log("Trying with CORS proxy:", proxyUrl);
+        
+        loader.load(
+          proxyUrl,
+          (gltf) => {
+            console.log("Model loaded successfully with proxy:", gltf);
+            setModel(gltf.scene);
+            setLoading(false);
+            toast({
+              title: "Model loaded",
+              description: "3D model loaded successfully using proxy",
+            });
+          },
+          (progress) => {
+            console.log(`Proxy loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+          },
+          (proxyError) => {
+            console.error("Proxy loading failed:", proxyError);
+            onError(proxyError);
+            setLoading(false);
+            toast({
+              title: "Loading failed",
+              description: "Failed to load the 3D model. Please try downloading it instead.",
+              variant: "destructive",
+            });
+          }
+        );
+      }
+    );
+    
+    return () => {
+      // Cleanup function
+      if (model) {
+        model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+              if (Array.isArray(mesh.material)) {
+                mesh.material.forEach((material) => material.dispose());
+              } else {
+                mesh.material.dispose();
+              }
+            }
+          }
+        });
+      }
+    };
+  }, [url, onError, toast]);
+  
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+  
+  return model ? (
+    <Center scale={[1.5, 1.5, 1.5]}>
+      <primitive object={model} />
+    </Center>
+  ) : null;
 };
 
 // Fallback component shown when no model is available
@@ -176,10 +206,12 @@ const ModelViewer = ({
       return;
     }
 
+    console.log("Selected file:", file.name, "size:", file.size);
     setCustomFile(file);
     
     // Create blob URL for the file
     const objectUrl = URL.createObjectURL(file);
+    console.log("Created blob URL:", objectUrl);
     setCustomModelUrl(objectUrl);
     setModelError(null);
     setModelLoadAttempted(false);
@@ -255,7 +287,6 @@ const ModelViewer = ({
   };
 
   // Determine if we should show an error message
-  // Only show error if we don't have a model URL or we tried to load the model and failed
   const shouldShowError = (errorMessage || modelError) && 
     ((!modelUrl && !customModelUrl) || 
     (modelLoadAttempted && modelError));
