@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
 import ImagePreview from "@/components/ImagePreview";
-import ModelViewer from "@/components/ModelViewer";
+import ModelViewer from "@/components/model-viewer";
 import Footer from "@/components/Footer";
 import ApiKeyInput from "@/components/ApiKeyInput";
 import StudioHeader from "@/components/StudioHeader";
