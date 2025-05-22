@@ -16,7 +16,14 @@ export const useImageGeneration = () => {
   const [conversionProgress, setConversionProgress] = useState(0);
   const [conversionError, setConversionError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const currentTaskRef = useRef<string | null>(null);
+  const modelUrlRef = useRef<string | null>(null);
   const { toast } = useToast();
+
+  // Update the ref when modelUrl changes
+  useEffect(() => {
+    modelUrlRef.current = modelUrl;
+  }, [modelUrl]);
 
   // Clean up event source on unmount
   useEffect(() => {
@@ -54,6 +61,9 @@ export const useImageGeneration = () => {
 
   // Set up SSE connection for real-time updates on conversion
   const setupSSEConnection = (taskId: string) => {
+    // Store the current task ID
+    currentTaskRef.current = taskId;
+    
     // Close any existing connection
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -73,6 +83,13 @@ export const useImageGeneration = () => {
     // Handle connection error
     eventSource.onerror = (error) => {
       console.error('SSE connection error:', error);
+      
+      // Don't set an error if we already have a model URL
+      if (!modelUrlRef.current) {
+        // Start polling as a fallback if SSE connection fails
+        pollTaskStatus(taskId);
+      }
+      
       eventSource.close();
       eventSourceRef.current = null;
     };
@@ -131,6 +148,7 @@ export const useImageGeneration = () => {
           setModelUrl(data.modelUrl);
           setIsConverting(false);
           setConversionProgress(100);
+          setConversionError(null); // Clear any existing errors
           
           toast({
             title: "3D model created",
@@ -156,15 +174,19 @@ export const useImageGeneration = () => {
         const data = JSON.parse(event.data);
         console.error('SSE failure event:', data);
         
-        const errorMessage = data.error || data.details || 'Conversion failed';
-        setConversionError(errorMessage);
-        setIsConverting(false);
+        // Only set error if we don't already have a model URL
+        if (!modelUrlRef.current) {
+          const errorMessage = data.error || data.details || 'Conversion failed';
+          setConversionError(errorMessage);
+          
+          toast({
+            title: "Conversion failed",
+            description: errorMessage,
+            variant: "destructive",
+          });
+        }
         
-        toast({
-          title: "Conversion failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
+        setIsConverting(false);
         
         // Close the connection as we're done
         eventSource.close();
@@ -176,28 +198,106 @@ export const useImageGeneration = () => {
 
     eventSource.addEventListener('error', (event: any) => {
       try {
-        const data = event.data ? JSON.parse(event.data) : { error: 'Unknown error' };
-        console.error('SSE error event:', data);
+        let errorData;
+        try {
+          errorData = event.data ? JSON.parse(event.data) : { error: 'Unknown error' };
+        } catch (e) {
+          errorData = { error: 'Unknown error' };
+        }
+        console.error('SSE error event:', errorData);
         
-        const errorMessage = data.error || data.details || 'Error during conversion';
-        setConversionError(errorMessage);
-        setIsConverting(false);
-        
-        toast({
-          title: "Conversion error",
-          description: errorMessage,
-          variant: "destructive",
-        });
+        // Don't set error if we already have a model URL
+        if (!modelUrlRef.current) {
+          // Check task status directly as fallback
+          pollTaskStatus(taskId);
+        }
         
         // Close the connection as we're done
         eventSource.close();
         eventSourceRef.current = null;
       } catch (error) {
-        console.error('Error parsing SSE error event:', error);
+        console.error('Error handling SSE error event:', error);
       }
     });
 
     return eventSource;
+  };
+
+  // Fallback polling mechanism when SSE fails
+  const pollTaskStatus = async (taskId: string, maxAttempts = 60, delay = 5000) => {
+    // Don't start polling if we already have a model URL
+    if (modelUrlRef.current) return;
+    
+    let attempts = 0;
+    
+    const checkInterval = setInterval(async () => {
+      // If we already have a model URL or we're checking a different task, stop polling
+      if (
+        attempts >= maxAttempts || 
+        modelUrlRef.current !== null || 
+        taskId !== currentTaskRef.current
+      ) {
+        clearInterval(checkInterval);
+        return;
+      }
+      
+      attempts++;
+      try {
+        const statusResponse = await fetch(`${SUPABASE_URL}/functions/v1/check-3d-status?taskId=${taskId}`, {
+          headers: {
+            "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+          }
+        });
+        
+        if (!statusResponse.ok) {
+          console.error(`Error checking status (attempt ${attempts}):`, statusResponse.status);
+          return;
+        }
+        
+        const statusData = await statusResponse.json();
+        console.log(`Status check (attempt ${attempts}):`, statusData);
+        
+        // Update progress
+        if (statusData.progress !== undefined) {
+          setConversionProgress(statusData.progress);
+        }
+        
+        // Check if completed
+        if (statusData.modelUrl) {
+          clearInterval(checkInterval);
+          
+          setModelUrl(statusData.modelUrl);
+          setConversionError(null); // Clear any errors since we got a valid URL
+          
+          toast({
+            title: "3D model created",
+            description: "Your figurine is ready to view in 3D",
+          });
+          
+          // Update figurine with model URL if we have one
+          if (currentFigurineId) {
+            await updateFigurineWithModelUrl(currentFigurineId, statusData.modelUrl);
+          }
+          
+          setIsConverting(false);
+        } else if (statusData.error && !modelUrlRef.current) {
+          clearInterval(checkInterval);
+          setConversionError(statusData.error);
+          setIsConverting(false);
+          
+          toast({
+            title: "Conversion failed",
+            description: statusData.error,
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error(`Error checking status (attempt ${attempts}):`, error);
+      }
+    }, delay);
+    
+    // Clean up the interval on unmount
+    return () => clearInterval(checkInterval);
   };
 
   // Generate image using a single generation attempt strategy
@@ -295,6 +395,7 @@ export const useImageGeneration = () => {
     setConversionProgress(0);
     setConversionError(null);
     setModelUrl(null);
+    modelUrlRef.current = null;
     
     try {
       // Check if the image URL is a blob URL
@@ -360,78 +461,7 @@ export const useImageGeneration = () => {
       setupSSEConnection(data.taskId);
       
       // Start checking status periodically as a backup to SSE
-      const checkStatus = async (taskId: string, maxAttempts = 60, delay = 5000) => {
-        let attempts = 0;
-        
-        const checkInterval = setInterval(async () => {
-          if (attempts >= maxAttempts || modelUrl !== null) {
-            clearInterval(checkInterval);
-            return;
-          }
-          
-          attempts++;
-          try {
-            const statusResponse = await fetch(`${SUPABASE_URL}/functions/v1/check-3d-status?taskId=${taskId}`, {
-              headers: {
-                "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-              }
-            });
-            
-            if (!statusResponse.ok) {
-              console.error(`Error checking status (attempt ${attempts}):`, statusResponse.status);
-              return;
-            }
-            
-            const statusData = await statusResponse.json();
-            console.log(`Status check (attempt ${attempts}):`, statusData);
-            
-            // Update progress
-            if (statusData.progress !== undefined) {
-              setConversionProgress(statusData.progress);
-            }
-            
-            // Check if completed
-            if (statusData.modelUrl) {
-              clearInterval(checkInterval);
-              
-              // Don't set the model URL if SSE has already done it
-              if (!modelUrl) {
-                setModelUrl(statusData.modelUrl);
-                
-                toast({
-                  title: "3D model created",
-                  description: "Your figurine is ready to view in 3D",
-                });
-                
-                // Update figurine with model URL if we have one
-                if (currentFigurineId) {
-                  await updateFigurineWithModelUrl(currentFigurineId, statusData.modelUrl);
-                }
-              }
-              
-              setIsConverting(false);
-            } else if (statusData.error) {
-              clearInterval(checkInterval);
-              setConversionError(statusData.error);
-              setIsConverting(false);
-              
-              toast({
-                title: "Conversion failed",
-                description: statusData.error,
-                variant: "destructive",
-              });
-            }
-          } catch (error) {
-            console.error(`Error checking status (attempt ${attempts}):`, error);
-          }
-        }, delay);
-        
-        // Clean up the interval on unmount
-        return () => clearInterval(checkInterval);
-      };
-      
-      // Start the backup status check
-      checkStatus(data.taskId);
+      pollTaskStatus(data.taskId);
       
     } catch (error) {
       console.error("Conversion error:", error);

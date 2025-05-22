@@ -52,10 +52,14 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [modelError, setModelError] = useState<string | null>(null);
+  const [modelLoadAttempted, setModelLoadAttempted] = useState(false);
 
   // Reset error state when modelUrl changes
   useEffect(() => {
-    setModelError(null);
+    if (modelUrl) {
+      setModelError(null);
+      setModelLoadAttempted(false);
+    }
   }, [modelUrl]);
 
   if (!modelUrl && !isLoading) {
@@ -76,8 +80,13 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
 
   const handleModelError = (error: any) => {
     console.error("Error loading 3D model:", error);
-    setModelError("Failed to load 3D model. Please try again.");
+    setModelError("Failed to load 3D model. The download may still work.");
+    setModelLoadAttempted(true);
   };
+
+  // Determine if we should show an error message
+  // Only show error if we don't have a model URL or we tried to load the model and failed
+  const shouldShowError = (errorMessage || modelError) && (!modelUrl || (modelLoadAttempted && modelError));
 
   return (
     <motion.div
@@ -118,11 +127,18 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
               </div>
             )}
           </div>
-        ) : errorMessage || modelError ? (
+        ) : shouldShowError ? (
           <div className="w-full h-full p-4 flex items-center justify-center text-center">
             <div className="text-red-400">
               <p>{errorMessage || modelError}</p>
-              <p className="text-sm text-white/50 mt-2">Try converting the image again</p>
+              {modelUrl && (
+                <p className="text-sm text-green-400 mt-2">
+                  A model URL was received. Try downloading it using the button below.
+                </p>
+              )}
+              {!modelUrl && (
+                <p className="text-sm text-white/50 mt-2">Try converting the image again</p>
+              )}
             </div>
           </div>
         ) : (
@@ -133,7 +149,12 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
             
             {modelUrl ? (
               // Wrap in error boundary
-              <ErrorBoundary fallback={<DummyBox />} onError={handleModelError}>
+              <ErrorBoundary 
+                fallback={<DummyBox />} 
+                onError={(error) => {
+                  handleModelError(error);
+                }}
+              >
                 <Model url={modelUrl} />
               </ErrorBoundary>
             ) : (
@@ -155,7 +176,7 @@ const ModelViewer = ({ modelUrl, isLoading, progress = 0, errorMessage = null }:
       <div className="p-4 flex justify-center">
         <Button
           className="w-full bg-figuro-accent hover:bg-figuro-accent-hover flex items-center gap-2"
-          disabled={!modelUrl || isLoading}
+          disabled={!modelUrl}
           onClick={handleDownload}
         >
           <Download size={16} />
