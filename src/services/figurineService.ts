@@ -68,7 +68,34 @@ export const fetchPublicFigurines = async (): Promise<Figurine[]> => {
       
     if (error) throw error;
     
-    return data || [];
+    // Map figurines to include direct storage URLs when available
+    const processedFigurines = await Promise.all((data || []).map(async (figurine) => {
+      // If we have a saved_image_url, ensure it's a direct storage URL
+      let imageUrl = figurine.image_url;
+      
+      if (figurine.saved_image_url) {
+        // Extract the path from the storage URL
+        const urlParts = figurine.saved_image_url.split('/');
+        const bucketName = 'figurine-images';
+        const filePath = urlParts[urlParts.length - 2] + '/' + urlParts[urlParts.length - 1];
+        
+        // Get a signed URL that doesn't expire for 60 minutes
+        const { data: signedUrlData } = await supabase.storage
+          .from(bucketName)
+          .createSignedUrl(filePath, 3600);
+          
+        if (signedUrlData?.signedUrl) {
+          imageUrl = signedUrlData.signedUrl;
+        }
+      }
+      
+      return {
+        ...figurine,
+        display_url: imageUrl
+      };
+    }));
+    
+    return processedFigurines;
   } catch (error) {
     console.error('Error fetching public figurines:', error);
     return [];

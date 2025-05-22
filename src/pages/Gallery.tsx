@@ -12,12 +12,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchPublicFigurines } from "@/services/figurineService";
 import { Figurine } from "@/types/figurine";
 import { useNavigate } from "react-router-dom";
-import { Download } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
+// Extend the Figurine type with the display URL
+interface GalleryFigurine extends Figurine {
+  display_url?: string;
+}
 
 const Gallery = () => {
   const [category, setCategory] = useState("all");
-  const [figurines, setFigurines] = useState<Figurine[]>([]);
+  const [figurines, setFigurines] = useState<GalleryFigurine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -50,9 +55,37 @@ const Gallery = () => {
       .channel('public-figurines')
       .on('postgres_changes', 
           { event: 'INSERT', schema: 'public', table: 'figurines', filter: 'is_public=eq.true' }, 
-          payload => {
+          async payload => {
+            // Process the new figurine to get storage URL
+            const newFigurine = payload.new as GalleryFigurine;
+            
+            // Get signed URL if we have a saved_image_url
+            if (newFigurine.saved_image_url) {
+              try {
+                // Extract the path from the storage URL
+                const urlParts = newFigurine.saved_image_url.split('/');
+                const bucketName = 'figurine-images';
+                const filePath = urlParts[urlParts.length - 2] + '/' + urlParts[urlParts.length - 1];
+                
+                // Get a signed URL that doesn't expire for 60 minutes
+                const { data: signedUrlData } = await supabase.storage
+                  .from(bucketName)
+                  .createSignedUrl(filePath, 3600);
+                  
+                if (signedUrlData?.signedUrl) {
+                  newFigurine.display_url = signedUrlData.signedUrl;
+                }
+              } catch (err) {
+                console.error('Error getting signed URL:', err);
+                // Fallback to the original image_url
+                newFigurine.display_url = newFigurine.image_url;
+              }
+            } else {
+              // Use the original image_url as fallback
+              newFigurine.display_url = newFigurine.image_url;
+            }
+            
             // Add the new figurine to the state
-            const newFigurine = payload.new as Figurine;
             setFigurines(prevFigurines => [newFigurine, ...prevFigurines]);
             
             // Show a toast notification
@@ -73,8 +106,8 @@ const Gallery = () => {
     navigate('/studio');
   };
   
-  const handleDownload = (figurine: Figurine) => {
-    const imageUrl = figurine.saved_image_url || figurine.image_url;
+  const handleDownload = (figurine: GalleryFigurine) => {
+    const imageUrl = figurine.display_url || figurine.saved_image_url || figurine.image_url;
     if (!imageUrl) return;
     
     // Create a temporary anchor element
@@ -84,6 +117,13 @@ const Gallery = () => {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+  
+  const handleView3DModel = (figurine: GalleryFigurine) => {
+    // Open the 3D model viewer in a new tab or modal
+    if (figurine.model_url) {
+      window.open(figurine.model_url, '_blank');
+    }
   };
   
   // Filter figurines by style category if selected
@@ -159,7 +199,7 @@ const Gallery = () => {
                       </div>
                       <div className="aspect-square relative overflow-hidden bg-white/5">
                         <img 
-                          src={figurine.saved_image_url || figurine.image_url} 
+                          src={figurine.display_url || figurine.saved_image_url || figurine.image_url} 
                           alt={figurine.title || "Figurine"} 
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                           loading="lazy"
@@ -172,6 +212,14 @@ const Gallery = () => {
                             >
                               <Download size={16} className="mr-2" /> Download
                             </Button>
+                            {figurine.model_url && (
+                              <Button 
+                                onClick={() => handleView3DModel(figurine)}
+                                className="w-full mt-2 bg-transparent border border-white/20 hover:bg-white/10"
+                              >
+                                <Eye size={16} className="mr-2" /> View 3D Model
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
