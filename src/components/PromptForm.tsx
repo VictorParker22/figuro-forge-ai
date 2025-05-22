@@ -20,15 +20,16 @@ const ART_STYLES = [
 interface PromptFormProps {
   onGenerate: (prompt: string, style: string) => void;
   isGenerating: boolean;
+  disableGenerate?: boolean;
 }
 
-const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
+const PromptForm = ({ onGenerate, isGenerating, disableGenerate = false }: PromptFormProps) => {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("isometric"); // Isometric is already the default
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || disableGenerate) return;
     onGenerate(prompt, style);
   };
 
@@ -83,11 +84,21 @@ const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
           
           <Button
             type="submit"
-            className={`w-full bg-figuro-accent hover:bg-figuro-accent-hover ${isGenerating ? 'animate-pulse' : ''}`}
-            disabled={isGenerating || !prompt.trim()}
+            className={`w-full bg-figuro-accent hover:bg-figuro-accent-hover ${isGenerating ? 'animate-pulse' : ''} ${disableGenerate ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={isGenerating || !prompt.trim() || disableGenerate}
           >
-            {isGenerating ? "Generating..." : "Generate Figurine"}
+            {disableGenerate 
+              ? "Generation Limit Reached" 
+              : isGenerating 
+                ? "Generating..." 
+                : "Generate Figurine"}
           </Button>
+          
+          {disableGenerate && (
+            <p className="text-xs text-center text-white/50 mt-2">
+              You've reached your limit of 4 generated images.
+            </p>
+          )}
         </form>
       </motion.div>
       

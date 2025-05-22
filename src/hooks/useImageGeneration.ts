@@ -11,11 +11,83 @@ export const useImageGeneration = () => {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [requiresApiKey, setRequiresApiKey] = useState(false);
   const [currentFigurineId, setCurrentFigurineId] = useState<string | null>(null);
+  const [generationsLeft, setGenerationsLeft] = useState<number | null>(null);
   const { toast } = useToast();
+
+  // Check for remaining generations when user authenticates
+  useEffect(() => {
+    const checkRemainingGenerations = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('generation_count')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (data) {
+          // Users are allowed 4 generations
+          setGenerationsLeft(Math.max(0, 4 - data.generation_count));
+        }
+      }
+    };
+
+    checkRemainingGenerations();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkRemainingGenerations();
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Save image to storage and update figurine record
+  const saveImageToStorage = async (imageBlob: Blob, figurineId: string): Promise<string | null> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return null;
+      
+      const filePath = `${session.user.id}/${figurineId}.png`;
+      
+      // Upload image to storage
+      const { data, error } = await supabase.storage
+        .from('figurine-images')
+        .upload(filePath, imageBlob, {
+          contentType: 'image/png',
+          upsert: true
+        });
+      
+      if (error) {
+        console.error('Storage upload error:', error);
+        return null;
+      }
+      
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('figurine-images')
+        .getPublicUrl(filePath);
+        
+      return publicUrlData.publicUrl;
+    } catch (error) {
+      console.error('Failed to save image to storage:', error);
+      return null;
+    }
+  };
 
   // Generate image using the Edge Function or directly
   const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string) => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
+    
+    // Check if user has reached their generation limit
+    if (generationsLeft !== null && generationsLeft <= 0) {
+      toast({
+        title: "Generation limit reached",
+        description: "You've reached your limit of 4 generated images.",
+        variant: "destructive",
+      });
+      return { success: false, limitReached: true };
+    }
     
     setIsGeneratingImage(true);
     setGeneratedImage(null);
@@ -23,9 +95,16 @@ export const useImageGeneration = () => {
     setCurrentFigurineId(null);
     
     try {
+      let imageUrl: string | null = null;
+      let imageBlob: Blob | null = null;
+
       // Use the pre-generated image URL if provided
       if (preGeneratedImageUrl) {
-        setGeneratedImage(preGeneratedImageUrl);
+        imageUrl = preGeneratedImageUrl;
+        
+        // Fetch the blob from the URL for storage
+        const response = await fetch(preGeneratedImageUrl);
+        imageBlob = await response.blob();
       } else {
         // Otherwise call the edge function
         const response = await fetch(`${window.location.origin}/functions/v1/generate-image`, {
@@ -64,28 +143,45 @@ export const useImageGeneration = () => {
           }
         }
         
-        // Otherwise, it's an image, so create a blob URL
-        const blob = await response.blob();
-        const imageUrl = URL.createObjectURL(blob);
+        // Otherwise, it's an image, so create a blob
+        imageBlob = await response.blob();
+        imageUrl = URL.createObjectURL(imageBlob);
         setGeneratedImage(imageUrl);
       }
       
       // Save the figurine to Supabase if user is authenticated
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // We'll need to upload the image to storage in a real app
-        // For now, just save the reference
+        // Generate a new ID for the figurine
         const figurineId = uuidv4();
         setCurrentFigurineId(figurineId);
         
+        // Save image to storage if we have a blob
+        let savedImageUrl = null;
+        if (imageBlob) {
+          savedImageUrl = await saveImageToStorage(imageBlob, figurineId);
+        }
+        
+        // Insert new figurine
         await supabase.from('figurines').insert({
           id: figurineId,
           user_id: session.user.id,
           prompt: prompt,
-          style: style as any, // Match the enum type
-          image_url: preGeneratedImageUrl || generatedImage, // Use the image URL we have
-          title: prompt.substring(0, 50) // Use part of the prompt as title
+          style: style as any,
+          image_url: imageUrl,
+          saved_image_url: savedImageUrl,
+          title: prompt.substring(0, 50)
         });
+        
+        // Update generation count
+        await supabase.from('profiles')
+          .update({ generation_count: supabase.rpc('increment', { inc_amount: 1 }) })
+          .eq('id', session.user.id);
+        
+        // Update generations left
+        if (generationsLeft !== null) {
+          setGenerationsLeft(Math.max(0, generationsLeft - 1));
+        }
       }
       
       return { success: true, needsApiKey: false };
@@ -155,6 +251,7 @@ export const useImageGeneration = () => {
     handleGenerate,
     handleConvertTo3D,
     requiresApiKey,
-    currentFigurineId
+    currentFigurineId,
+    generationsLeft
   };
 };
