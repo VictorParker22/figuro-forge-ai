@@ -22,6 +22,17 @@ export const saveFigurine = async (
     let savedImageUrl = null;
     if (imageBlob) {
       savedImageUrl = await saveImageToStorage(imageBlob, figurineId);
+      console.log('Image saved to storage:', savedImageUrl);
+    } else if (imageUrl) {
+      // If we only have an URL but no blob, fetch the image and save it
+      try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        savedImageUrl = await saveImageToStorage(blob, figurineId);
+        console.log('Image fetched and saved to storage:', savedImageUrl);
+      } catch (fetchError) {
+        console.error('Error fetching image from URL:', fetchError);
+      }
     }
     
     // Create figurine data object
