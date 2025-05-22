@@ -18,27 +18,40 @@ interface ModelSceneProps {
 const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelSceneProps) => {
   // Track the current model source to prevent unnecessary re-renders
   const currentSourceRef = useRef<string | Blob | null>(null);
-  const [stableSource, setStableSource] = useState<string | Blob | null>(modelBlob || modelUrl);
+  const [stableSource, setStableSource] = useState<string | null>(modelUrl);
+  const [stableBlob, setStableBlob] = useState<Blob | null>(modelBlob || null);
   
   // Stabilize the source to prevent rapid changes
   useEffect(() => {
-    // Determine the current source (prefer Blob over URL)
-    const currentSource = modelBlob || modelUrl;
-    
-    // Only update if the source has actually changed
-    if (currentSource !== currentSourceRef.current) {
-      console.log("ModelScene: Source changed to", 
-        typeof currentSource === 'string' ? currentSource : 'Blob object');
-      currentSourceRef.current = currentSource;
+    // Determine if there's been an actual change in modelUrl
+    if (modelUrl !== currentSourceRef.current) {
+      console.log("ModelScene: URL source changed to", modelUrl);
+      currentSourceRef.current = modelUrl;
       
       // Small delay to ensure stable updates
       const timer = setTimeout(() => {
-        setStableSource(currentSource);
+        setStableSource(modelUrl);
       }, 50);
       
       return () => clearTimeout(timer);
     }
-  }, [modelUrl, modelBlob]);
+  }, [modelUrl]);
+  
+  // Separate effect for blob changes to prevent dependencies conflicts
+  useEffect(() => {
+    // Only update if the blob itself has changed
+    if (modelBlob && modelBlob !== currentSourceRef.current) {
+      console.log("ModelScene: Blob source changed");
+      currentSourceRef.current = modelBlob;
+      
+      // Small delay to ensure stable updates
+      const timer = setTimeout(() => {
+        setStableBlob(modelBlob);
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [modelBlob]);
 
   // Handler for errors in the 3D model
   const handleModelError = (error: any) => {
@@ -53,12 +66,16 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
       <PerspectiveCamera makeDefault position={[0, 0, 5]} />
       
       <Suspense fallback={<LoadingSpinner />}>
-        {stableSource ? (
+        {(stableSource || stableBlob) ? (
           <ErrorBoundary 
             fallback={<DummyBox />} 
             onError={handleModelError}
           >
-            <Model3D modelSource={stableSource} onError={handleModelError} />
+            <Model3D 
+              modelSource={stableSource} 
+              modelBlob={stableBlob}
+              onError={handleModelError} 
+            />
           </ErrorBoundary>
         ) : (
           <DummyBox />

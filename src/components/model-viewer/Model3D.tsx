@@ -7,11 +7,12 @@ import { useToast } from "@/hooks/use-toast";
 import LoadingSpinner from "./LoadingSpinner";
 
 interface Model3DProps {
-  modelSource: string | Blob | null;
+  modelSource: string | null;
+  modelBlob?: Blob | null;
   onError: (error: any) => void;
 }
 
-const Model3D = ({ modelSource, onError }: Model3DProps) => {
+const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<THREE.Group | null>(null);
   const { toast } = useToast();
@@ -21,16 +22,33 @@ const Model3D = ({ modelSource, onError }: Model3DProps) => {
   const isLoadingRef = useRef<boolean>(false);
   const controllerRef = useRef<AbortController | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  
+  // Add refs to track last loaded blob/URL to prevent infinite loops
+  const lastBlobRef = useRef<Blob | null>(null);
+  const lastUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     console.log("Model3D: Effect triggered with source:", 
       typeof modelSource === 'string' ? modelSource : 'Blob object');
     
-    // Don't attempt to load if no source is provided
-    if (!modelSource) {
+    // Skip effect if no source provided
+    if (!modelSource && !modelBlob) {
       console.log("No model source provided, skipping load");
       return;
     }
+    
+    // Check if the same source is being loaded again to prevent infinite loops
+    const isRepeatedBlob = modelBlob && lastBlobRef.current && modelBlob === lastBlobRef.current;
+    const isRepeatedUrl = modelSource && lastUrlRef.current && modelSource === lastUrlRef.current;
+    
+    if (isRepeatedBlob || isRepeatedUrl) {
+      console.log("Same model source detected, skipping reload");
+      return;
+    }
+    
+    // Update last loaded sources
+    if (modelBlob) lastBlobRef.current = modelBlob;
+    if (modelSource) lastUrlRef.current = modelSource;
     
     // Create new abort controller for this load operation
     if (controllerRef.current) {
@@ -50,22 +68,29 @@ const Model3D = ({ modelSource, onError }: Model3DProps) => {
     const loadModel = async () => {
       try {
         let modelUrl: string;
+        let shouldRevokeUrl = false;
         
         // Handle different source types
-        if (typeof modelSource === 'string') {
-          // It's a URL string
-          modelUrl = modelSource;
-          console.log("Loading from URL string:", modelUrl);
-        } else {
+        if (modelBlob) {
           // It's a Blob object, create an object URL
           if (objectUrlRef.current) {
             URL.revokeObjectURL(objectUrlRef.current);
             objectUrlRef.current = null;
           }
           
-          objectUrlRef.current = URL.createObjectURL(modelSource);
+          objectUrlRef.current = URL.createObjectURL(modelBlob);
           modelUrl = objectUrlRef.current;
-          console.log("Created and loading from object URL:", modelUrl);
+          shouldRevokeUrl = true;
+          console.log("Created and loading from blob object URL:", modelUrl);
+        } else if (typeof modelSource === 'string') {
+          // It's a URL string
+          modelUrl = modelSource;
+          console.log("Loading from URL string:", modelUrl);
+        } else {
+          console.log("Invalid model source");
+          setLoading(false);
+          isLoadingRef.current = false;
+          return;
         }
         
         // Load the model
@@ -110,7 +135,7 @@ const Model3D = ({ modelSource, onError }: Model3DProps) => {
           if (controllerRef.current?.signal.aborted) return;
           
           // If it's a string URL and not a blob URL, try with CORS proxy
-          if (typeof modelSource === 'string' && !modelSource.startsWith('blob:')) {
+          if (typeof modelSource === 'string' && !modelSource.startsWith('blob:') && !modelBlob) {
             try {
               const proxyUrl = `https://cors-proxy.fringe.zone/${encodeURIComponent(modelSource)}`;
               console.log("Trying with CORS proxy:", proxyUrl);
@@ -136,8 +161,8 @@ const Model3D = ({ modelSource, onError }: Model3DProps) => {
               });
             }
           } else {
-            // For blob URLs, just report the error
-            console.error("Failed to load from blob URL:", directError);
+            // For blob URLs or blob objects, just report the error
+            console.error("Failed to load from blob:", directError);
             onError(directError);
             setLoading(false);
             isLoadingRef.current = false;
@@ -213,7 +238,7 @@ const Model3D = ({ modelSource, onError }: Model3DProps) => {
       isLoadingRef.current = false;
       loaderRef.current = null;
     };
-  }, [modelSource, onError, toast, model]);
+  }, [modelSource, modelBlob, onError, toast, model]);
   
   if (loading) {
     return <LoadingSpinner />;
