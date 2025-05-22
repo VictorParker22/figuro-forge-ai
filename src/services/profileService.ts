@@ -51,7 +51,7 @@ export const incrementGenerationCount = async (): Promise<void> => {
       column_name: 'generation_count',
       id: session.user.id,
       id_column: 'id'
-    });
+    } as any); // Use 'as any' to bypass TypeScript strict checking for RPC parameters
     
     if (rpcError) {
       console.error('Error incrementing generation count via RPC:', rpcError);
