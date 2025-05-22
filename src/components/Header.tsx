@@ -43,7 +43,7 @@ const Header = () => {
           <Button variant="ghost" className="text-sm hidden md:inline-flex">
             Login
           </Button>
-          <Button className="bg-white text-figuro-dark hover:bg-white/90">
+          <Button className="bg-figuro-accent hover:bg-figuro-accent-hover text-white">
             Start free
           </Button>
         </div>

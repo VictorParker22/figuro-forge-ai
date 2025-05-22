@@ -8,7 +8,7 @@ const Hero = () => {
   return (
     <section className="pt-32 pb-20 relative overflow-hidden min-h-screen flex items-center justify-center">
       <div className="absolute inset-0 bg-figuro-dark pointer-events-none">
-        {/* Subtle gradient lines like in the image */}
+        {/* Subtle gradient lines */}
         <div className="absolute left-0 right-0 bottom-0 h-1/2 bg-gradient-to-t from-figuro-dark to-transparent opacity-80" />
         <div className="absolute w-px h-[500px] bg-figuro-accent/10 rotate-12 left-[10%] top-[20%]"></div>
         <div className="absolute w-px h-[700px] bg-figuro-accent/10 -rotate-12 right-[10%] top-[10%]"></div>
@@ -36,7 +36,7 @@ const Hero = () => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            Generate, preview, and edit code instantly.
+            Generate, preview, and edit code instantly with Figuro.AI
           </motion.p>
           
           <motion.div
@@ -54,6 +54,9 @@ const Hero = () => {
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </div>
+            <p className="text-white/50 text-sm mt-3">
+              Start converting your designs in seconds. No credit card required.
+            </p>
           </motion.div>
         </div>
       </motion.div>
