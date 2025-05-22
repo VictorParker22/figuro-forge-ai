@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera, Stage } from "@react-three/drei";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download } from "lucide-react";
 
@@ -54,10 +54,10 @@ const ModelViewer = ({ modelUrl, isLoading }: ModelViewerProps) => {
           </div>
         ) : (
           <Canvas shadows dpr={[1, 2]}>
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[10, 10, 5]} intensity={1} />
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
-            <Stage environment="city" intensity={0.5}>
-              <DummyBox />
-            </Stage>
+            <DummyBox />
             <OrbitControls 
               autoRotate={autoRotate}
               autoRotateSpeed={2}
