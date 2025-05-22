@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -8,13 +9,9 @@ import ApiKeyInput from "@/components/ApiKeyInput";
 import StudioHeader from "@/components/StudioHeader";
 import FigurineGallery from "@/components/FigurineGallery";
 import { useImageGeneration } from "@/hooks/useImageGeneration";
-import { generateImageWithEdge } from "@/lib/edgeFunction";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 
 const Studio = () => {
   const [apiKey, setApiKey] = useState<string | "">("");
@@ -29,8 +26,7 @@ const Studio = () => {
     modelUrl,
     handleGenerate,
     handleConvertTo3D,
-    requiresApiKey,
-    generationsLeft
+    requiresApiKey
   } = useImageGeneration();
 
   // Check for authenticated user
@@ -131,8 +127,6 @@ const Studio = () => {
       
       if (result.needsApiKey) {
         setShowApiInput(true);
-      } else if (result.limitReached) {
-        // Do nothing, the hook will show a toast
       } else {
         toast({
           title: "Generation failed",
@@ -192,22 +186,11 @@ const Studio = () => {
             />
           )}
           
-          {user && generationsLeft !== null && generationsLeft < 10 && (
-            <Alert variant="default" className="mb-6 bg-figuro-accent/10 border-figuro-accent/20">
-              <AlertCircle className="h-4 w-4 text-figuro-accent" />
-              <AlertTitle>Generation Limit</AlertTitle>
-              <AlertDescription>
-                You have {generationsLeft} {generationsLeft === 1 ? 'generation' : 'generations'} left out of 10.
-              </AlertDescription>
-            </Alert>
-          )}
-          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div>
               <PromptForm 
                 onGenerate={onGenerate} 
-                isGenerating={isGeneratingImage} 
-                disableGenerate={generationsLeft === 0}
+                isGenerating={isGeneratingImage}
               />
             </div>
             

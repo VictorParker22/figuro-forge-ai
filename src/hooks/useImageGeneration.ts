@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { getRemainingGenerations, incrementGenerationCount } from "@/services/profileService";
+import { incrementGenerationCount } from "@/services/profileService";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
 
@@ -11,32 +11,11 @@ export const useImageGeneration = () => {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [requiresApiKey, setRequiresApiKey] = useState(false);
   const [currentFigurineId, setCurrentFigurineId] = useState<string | null>(null);
-  const [generationsLeft, setGenerationsLeft] = useState<number | null>(null);
   const { toast } = useToast();
-
-  // Check for remaining generations when user authenticates
-  useEffect(() => {
-    const checkRemainingGenerations = async () => {
-      const remainingGenerations = await getRemainingGenerations();
-      setGenerationsLeft(remainingGenerations);
-    };
-
-    checkRemainingGenerations();
-  }, []);
 
   // Generate image using the Edge Function or directly
   const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string) => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
-    
-    // Check if user has reached their generation limit
-    if (generationsLeft !== null && generationsLeft <= 0) {
-      toast({
-        title: "Generation limit reached",
-        description: "You've reached your limit of 4 generated images.",
-        variant: "destructive",
-      });
-      return { success: false, limitReached: true };
-    }
     
     setIsGeneratingImage(true);
     setGeneratedImage(null);
@@ -87,11 +66,6 @@ export const useImageGeneration = () => {
           
           // Update the generation count
           await incrementGenerationCount();
-          
-          // Update generations left
-          if (generationsLeft !== null) {
-            setGenerationsLeft(Math.max(0, generationsLeft - 1));
-          }
         }
       }
       
@@ -151,7 +125,6 @@ export const useImageGeneration = () => {
     handleGenerate,
     handleConvertTo3D,
     requiresApiKey,
-    currentFigurineId,
-    generationsLeft
+    currentFigurineId
   };
 };
