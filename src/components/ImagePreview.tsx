@@ -1,4 +1,5 @@
 
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,7 +23,7 @@ const ImagePreview = ({
   generationMethod 
 }: ImagePreviewProps) => {
   const { toast } = useToast();
-  const [imageError, setImageError] = React.useState<boolean>(false);
+  const [imageError, setImageError] = useState<boolean>(false);
   
   if (!imageSrc && !isLoading) {
     return null;
