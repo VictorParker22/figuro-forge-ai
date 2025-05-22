@@ -16,7 +16,6 @@ import { Progress } from "@/components/ui/progress";
 import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
 // Import GLTFLoader through drei's exposed version instead of directly from three.js
-// This avoids TypeScript declaration issues
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 interface ModelViewerProps {
@@ -41,31 +40,69 @@ const LoadingSpinner = () => (
 const Model = ({ url, onError }: { url: string; onError: (error: any) => void }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  
-  // For blob URLs, we'll use useGLTF directly
-  if (url.startsWith('blob:')) {
-    try {
-      const { scene } = useGLTF(url);
-      return (
-        <Center scale={[1.5, 1.5, 1.5]}>
-          <primitive object={scene} />
-        </Center>
-      );
-    } catch (error) {
-      console.error("Error loading blob URL model:", error);
-      onError(error);
-      return null;
-    }
-  }
-  
-  // For remote URLs, we'll use GLTFLoader with proper error handling
   const [model, setModel] = useState<THREE.Group | null>(null);
   
   useEffect(() => {
-    setLoading(true);
-    const loader = new GLTFLoader();
+    if (!url) return;
     
+    setLoading(true);
     console.log("Attempting to load model from URL:", url);
+    
+    // For blob URLs, we need special handling
+    if (url.startsWith('blob:')) {
+      try {
+        const loader = new GLTFLoader();
+        
+        loader.load(
+          url,
+          (gltf) => {
+            console.log("Blob URL model loaded successfully:", gltf);
+            setModel(gltf.scene);
+            setLoading(false);
+            toast({
+              title: "Model loaded",
+              description: "Custom 3D model loaded successfully",
+            });
+          },
+          // Progress callback
+          (progress) => {
+            console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+          },
+          // Error callback
+          (error) => {
+            console.error("Error loading blob URL model:", error);
+            onError(error);
+            setLoading(false);
+          }
+        );
+      } catch (error) {
+        console.error("Error setting up blob URL model loader:", error);
+        onError(error);
+        setLoading(false);
+      }
+      
+      return () => {
+        // Cleanup function for blob URLs
+        if (model) {
+          model.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              const mesh = child as THREE.Mesh;
+              if (mesh.geometry) mesh.geometry.dispose();
+              if (mesh.material) {
+                if (Array.isArray(mesh.material)) {
+                  mesh.material.forEach((material) => material.dispose());
+                } else {
+                  mesh.material.dispose();
+                }
+              }
+            }
+          });
+        }
+      };
+    }
+    
+    // For remote URLs, use the original approach
+    const loader = new GLTFLoader();
     
     // Try to load the model directly first
     loader.load(

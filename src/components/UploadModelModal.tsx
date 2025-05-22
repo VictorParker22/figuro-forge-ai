@@ -77,6 +77,7 @@ const UploadModelModal = ({ isOpen, onOpenChange, onModelUpload }: UploadModelMo
     try {
       // Create blob URL for the file
       const objectUrl = URL.createObjectURL(selectedFile);
+      console.log("Created blob URL for upload:", objectUrl);
       onModelUpload(objectUrl, selectedFile);
       
       toast({
