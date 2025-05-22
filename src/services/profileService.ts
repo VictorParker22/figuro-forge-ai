@@ -19,7 +19,7 @@ export const getRemainingGenerations = async (): Promise<number> => {
       
     if (profileError) {
       console.error('Error fetching profile:', profileError);
-      return 4; // Default to allowing generations
+      return 10; // Default to allowing 10 generations (increased from 4)
     }
     
     // Cast profileData to our more flexible Profile type
@@ -30,11 +30,11 @@ export const getRemainingGenerations = async (): Promise<number> => {
       ? profile.generation_count 
       : 0;
     
-    // Users are allowed 4 generations
-    return Math.max(0, 4 - generationCount);
+    // Users are allowed 10 generations (increased from 4)
+    return Math.max(0, 10 - generationCount);
   } catch (err) {
     console.error('Error checking generations:', err);
-    return 4; // Default to allowing generations if we can't check
+    return 10; // Default to allowing 10 generations if we can't check (increased from 4)
   }
 };
 
@@ -45,7 +45,7 @@ export const incrementGenerationCount = async (): Promise<void> => {
     if (!session?.user) return;
     
     // Define the type for the RPC parameters
-    interface IncrementParams {
+    type IncrementParams = {
       inc_amount: number;
       table_name: string;
       column_name: string;
@@ -53,8 +53,8 @@ export const incrementGenerationCount = async (): Promise<void> => {
       id_column: string;
     }
     
-    // Try using the RPC function with properly typed parameters
-    const { error: rpcError } = await supabase.rpc('increment', {
+    // Use type assertion with a specific type to fix the TypeScript error
+    const { error: rpcError } = await supabase.rpc<any>('increment', {
       inc_amount: 1,
       table_name: 'profiles',
       column_name: 'generation_count',
@@ -77,7 +77,7 @@ export const incrementGenerationCount = async (): Promise<void> => {
         const profile = profileData as Profile;
         const currentCount = typeof profile.generation_count === 'number' ? profile.generation_count : 0;
         
-        // Use a safe update approach with a cast to handle the flexible type
+        // Use a safe update approach
         await supabase
           .from('profiles')
           .update({ 

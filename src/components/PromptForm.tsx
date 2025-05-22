@@ -96,7 +96,7 @@ const PromptForm = ({ onGenerate, isGenerating, disableGenerate = false }: Promp
           
           {disableGenerate && (
             <p className="text-xs text-center text-white/50 mt-2">
-              You've reached your limit of 4 generated images.
+              You've reached your limit of 10 generated images.
             </p>
           )}
         </form>

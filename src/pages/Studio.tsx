@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -193,12 +192,12 @@ const Studio = () => {
             />
           )}
           
-          {user && generationsLeft !== null && generationsLeft < 4 && (
+          {user && generationsLeft !== null && generationsLeft < 10 && (
             <Alert variant="default" className="mb-6 bg-figuro-accent/10 border-figuro-accent/20">
               <AlertCircle className="h-4 w-4 text-figuro-accent" />
               <AlertTitle>Generation Limit</AlertTitle>
               <AlertDescription>
-                You have {generationsLeft} {generationsLeft === 1 ? 'generation' : 'generations'} left out of 4.
+                You have {generationsLeft} {generationsLeft === 1 ? 'generation' : 'generations'} left out of 10.
               </AlertDescription>
             </Alert>
           )}
