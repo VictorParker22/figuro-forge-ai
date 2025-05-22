@@ -64,7 +64,8 @@ serve(async (req: Request) => {
     }
 
     // Step 1: Create a task to generate a 3D model from the image
-    const createTaskResponse = await fetch('https://api.meshy.ai/v2/image-to-3d', {
+    // Updated to use the correct API endpoint path based on Meshy's latest API docs
+    const createTaskResponse = await fetch('https://api.meshy.ai/v2/image-to-3d/tasks', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${MESHY_API_KEY}`,
@@ -80,7 +81,7 @@ serve(async (req: Request) => {
     }
 
     const taskData = await createTaskResponse.json()
-    const taskId = taskData.taskId
+    const taskId = taskData.taskId || taskData.id
 
     if (!taskId) {
       console.error("No task ID in response:", taskData)
@@ -102,7 +103,8 @@ serve(async (req: Request) => {
       await new Promise(resolve => setTimeout(resolve, delayMs))
       
       console.log(`Checking task status, attempt ${attempts}/${maxAttempts}`)
-      const statusResponse = await fetch(`https://api.meshy.ai/v2/task-status?taskId=${taskId}`, {
+      // Updated to use the correct task status endpoint
+      const statusResponse = await fetch(`https://api.meshy.ai/v2/tasks/${taskId}`, {
         headers: {
           'Authorization': `Bearer ${MESHY_API_KEY}`,
         }
@@ -118,7 +120,7 @@ serve(async (req: Request) => {
       console.log(`Task status: ${statusData.status}, attempt ${attempts}/${maxAttempts}`)
 
       if (statusData.status === 'SUCCESS') {
-        modelUrl = statusData.result?.glbUrl || null
+        modelUrl = statusData.result?.glbUrl || statusData.output?.glbUrl || null
         console.log(`Task completed successfully. Model URL: ${modelUrl}`)
         break
       } else if (statusData.status === 'FAILED') {
