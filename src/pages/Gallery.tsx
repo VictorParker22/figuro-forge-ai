@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/Header";
@@ -9,7 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Download } from "lucide-react";
+import { Download, Upload, CubeIcon } from "lucide-react";
+import UploadModelModal from "@/components/UploadModelModal";
+import ModelViewer from "@/components/model-viewer";
 
 interface BucketImage {
   name: string;
@@ -22,6 +23,10 @@ interface BucketImage {
 const Gallery = () => {
   const [images, setImages] = useState<BucketImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [customModelUrl, setCustomModelUrl] = useState<string | null>(null);
+  const [customModelFile, setCustomModelFile] = useState<File | null>(null);
+  const [viewingModel, setViewingModel] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -140,6 +145,49 @@ const Gallery = () => {
     document.body.removeChild(a);
   };
 
+  // Handle model upload from modal
+  const handleModelUpload = (url: string, file: File) => {
+    setCustomModelUrl(url);
+    setCustomModelFile(file);
+    
+    // Upload to storage 
+    const uploadModel = async () => {
+      try {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `models/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('figurine-images')
+          .upload(filePath, file);
+          
+        if (uploadError) {
+          throw uploadError;
+        }
+        
+        const { data } = supabase.storage
+          .from('figurine-images')
+          .getPublicUrl(filePath);
+          
+        toast({
+          title: "Model uploaded",
+          description: `Your 3D model has been uploaded to the gallery`,
+        });
+        
+        // Refresh the gallery
+        fetchImagesFromBucket();
+      } catch (error) {
+        console.error('Error uploading model:', error);
+        toast({
+          title: "Upload failed",
+          description: "There was an error uploading your model",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    uploadModel();
+  };
+
   return (
     <div className="min-h-screen bg-figuro-dark">
       <Header />
@@ -154,9 +202,31 @@ const Gallery = () => {
           >
             <h1 className="text-3xl md:text-5xl font-bold mb-6 text-gradient">Community Gallery</h1>
             <p className="text-lg text-white/70 max-w-3xl mx-auto">
-              See figurines created by the community. All images are stored in our bucket.
+              See figurines and 3D models created by the community. Upload your own 3D models to share!
             </p>
+            
+            <div className="flex justify-center mt-8">
+              <Button 
+                onClick={() => setUploadModalOpen(true)}
+                className="bg-figuro-accent hover:bg-figuro-accent-hover flex items-center gap-2"
+              >
+                <CubeIcon size={18} />
+                Upload 3D Model
+              </Button>
+            </div>
           </motion.div>
+          
+          {customModelUrl && (
+            <div className="mb-16">
+              <h2 className="text-2xl font-bold mb-4 text-gradient text-center">Preview Your Uploaded Model</h2>
+              <div className="max-w-3xl mx-auto">
+                <ModelViewer 
+                  modelUrl={customModelUrl} 
+                  isLoading={false}
+                />
+              </div>
+            </div>
+          )}
           
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -231,6 +301,13 @@ const Gallery = () => {
           </motion.div>
         </div>
       </section>
+      
+      {/* Upload Model Modal */}
+      <UploadModelModal 
+        isOpen={uploadModalOpen}
+        onOpenChange={setUploadModalOpen}
+        onModelUpload={handleModelUpload}
+      />
       
       <Footer />
     </div>

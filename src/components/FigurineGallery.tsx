@@ -5,14 +5,17 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Eye, Download } from 'lucide-react';
+import { Eye, Download, CubeIcon } from 'lucide-react';
 import { Figurine } from '@/types/figurine';
+import ModelViewer from '@/components/model-viewer';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 const FigurineGallery = () => {
   const [figurines, setFigurines] = useState<Figurine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFigurine, setSelectedFigurine] = useState<Figurine | null>(null);
+  const [modelViewerOpen, setModelViewerOpen] = useState(false);
 
   useEffect(() => {
     const fetchFigurines = async () => {
@@ -84,6 +87,11 @@ const FigurineGallery = () => {
     document.body.removeChild(a);
   };
 
+  const handleViewModel = (figurine: Figurine) => {
+    setSelectedFigurine(figurine);
+    setModelViewerOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -116,58 +124,80 @@ const FigurineGallery = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {figurines.map((figurine) => (
-        <motion.div 
-          key={figurine.id}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <Card className="glass-panel overflow-hidden">
-            <CardHeader className="p-3 border-b border-white/10">
-              <CardTitle className="text-sm font-medium truncate">{figurine.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="aspect-square w-full p-2">
-                <img 
-                  src={figurine.saved_image_url || figurine.image_url} 
-                  alt={figurine.title}
-                  className="w-full h-full object-contain rounded-md"
-                  loading="lazy" 
-                />
-              </div>
-            </CardContent>
-            <CardFooter className="p-2 gap-2 flex justify-between">
-              <span className="text-xs text-white/50 italic">
-                {new Date(figurine.created_at).toLocaleDateString()}
-              </span>
-              <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 bg-transparent border-white/10"
-                  onClick={() => handleDownload(figurine)}
-                  title="Download"
-                >
-                  <Download size={14} />
-                </Button>
-                {figurine.model_url && (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {figurines.map((figurine) => (
+          <motion.div 
+            key={figurine.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <Card className="glass-panel overflow-hidden">
+              <CardHeader className="p-3 border-b border-white/10">
+                <CardTitle className="text-sm font-medium truncate">
+                  {figurine.title}
+                  {figurine.model_url && (
+                    <span className="ml-2 inline-flex items-center text-figuro-accent">
+                      <CubeIcon size={14} />
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="aspect-square w-full p-2">
+                  <img 
+                    src={figurine.saved_image_url || figurine.image_url} 
+                    alt={figurine.title}
+                    className="w-full h-full object-contain rounded-md"
+                    loading="lazy" 
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="p-2 gap-2 flex justify-between">
+                <span className="text-xs text-white/50 italic">
+                  {new Date(figurine.created_at).toLocaleDateString()}
+                </span>
+                <div className="flex gap-1">
                   <Button
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 bg-transparent border-white/10"
-                    title="View 3D model"
+                    onClick={() => handleDownload(figurine)}
+                    title="Download"
                   >
-                    <Eye size={14} />
+                    <Download size={14} />
                   </Button>
-                )}
-              </div>
-            </CardFooter>
-          </Card>
-        </motion.div>
-      ))}
-    </div>
+                  {figurine.model_url && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 bg-transparent border-white/10"
+                      onClick={() => handleViewModel(figurine)}
+                      title="View 3D model"
+                    >
+                      <Eye size={14} />
+                    </Button>
+                  )}
+                </div>
+              </CardFooter>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Model Viewer Dialog */}
+      <Dialog open={modelViewerOpen} onOpenChange={setModelViewerOpen}>
+        <DialogContent className="sm:max-w-[800px] p-0 bg-transparent border-none shadow-none">
+          {selectedFigurine?.model_url && (
+            <ModelViewer 
+              modelUrl={selectedFigurine.model_url} 
+              isLoading={false}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
