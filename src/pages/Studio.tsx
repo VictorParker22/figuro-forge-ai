@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -20,6 +19,7 @@ const Studio = () => {
   const [showApiInput, setShowApiInput] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [customModelUrl, setCustomModelUrl] = useState<string | null>(null);
+  const [customModelFile, setCustomModelFile] = useState<File | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const { toast } = useToast();
   
@@ -69,8 +69,9 @@ const Studio = () => {
   }, [requiresApiKey]);
 
   // When a custom model is loaded, reset any conversion process
-  const handleCustomModelLoad = (url: string) => {
+  const handleCustomModelLoad = (url: string, file: File) => {
     setCustomModelUrl(url);
+    setCustomModelFile(file);
     toast({
       title: "Custom model loaded",
       description: "Your custom 3D model has been loaded successfully",
@@ -81,6 +82,7 @@ const Studio = () => {
   const onGenerate = async (prompt: string, style: string) => {
     // Reset custom model when generating a new image
     setCustomModelUrl(null);
+    setCustomModelFile(null);
     
     // Call the handleGenerate function directly
     const result = await handleGenerate(prompt, style, apiKey);
@@ -93,6 +95,7 @@ const Studio = () => {
   // Handle model upload from modal
   const handleModelUpload = (url: string, file: File) => {
     setCustomModelUrl(url);
+    setCustomModelFile(file);
     toast({
       title: "Model uploaded",
       description: `${file.name} has been loaded successfully`,
@@ -119,6 +122,7 @@ const Studio = () => {
 
   // Determine which model URL to display - custom or generated
   const displayModelUrl = customModelUrl || modelUrl;
+  const displayModelFile = customModelFile;
 
   return (
     <div className="min-h-screen bg-figuro-dark">

@@ -10,30 +10,35 @@ import Model3D from "./Model3D";
 
 interface ModelSceneProps {
   modelUrl: string | null;
+  modelBlob?: Blob | null;
   autoRotate: boolean;
   onModelError: (error: any) => void;
 }
 
-const ModelScene = ({ modelUrl, autoRotate, onModelError }: ModelSceneProps) => {
-  // Track the current model URL to prevent unnecessary re-renders
-  const currentUrlRef = useRef<string | null>(null);
-  const [stableUrl, setStableUrl] = useState<string | null>(modelUrl);
+const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelSceneProps) => {
+  // Track the current model source to prevent unnecessary re-renders
+  const currentSourceRef = useRef<string | Blob | null>(null);
+  const [stableSource, setStableSource] = useState<string | Blob | null>(modelBlob || modelUrl);
   
-  // Stabilize the URL to prevent rapid changes
+  // Stabilize the source to prevent rapid changes
   useEffect(() => {
-    // Only update if the URL has actually changed and is not null
-    if (modelUrl !== currentUrlRef.current) {
-      console.log("ModelScene: URL changed from", currentUrlRef.current, "to", modelUrl);
-      currentUrlRef.current = modelUrl;
+    // Determine the current source (prefer Blob over URL)
+    const currentSource = modelBlob || modelUrl;
+    
+    // Only update if the source has actually changed
+    if (currentSource !== currentSourceRef.current) {
+      console.log("ModelScene: Source changed to", 
+        typeof currentSource === 'string' ? currentSource : 'Blob object');
+      currentSourceRef.current = currentSource;
       
       // Small delay to ensure stable updates
       const timer = setTimeout(() => {
-        setStableUrl(modelUrl);
+        setStableSource(currentSource);
       }, 50);
       
       return () => clearTimeout(timer);
     }
-  }, [modelUrl]);
+  }, [modelUrl, modelBlob]);
 
   // Handler for errors in the 3D model
   const handleModelError = (error: any) => {
@@ -48,12 +53,12 @@ const ModelScene = ({ modelUrl, autoRotate, onModelError }: ModelSceneProps) => 
       <PerspectiveCamera makeDefault position={[0, 0, 5]} />
       
       <Suspense fallback={<LoadingSpinner />}>
-        {stableUrl ? (
+        {stableSource ? (
           <ErrorBoundary 
             fallback={<DummyBox />} 
             onError={handleModelError}
           >
-            <Model3D url={stableUrl} onError={handleModelError} />
+            <Model3D modelSource={stableSource} onError={handleModelError} />
           </ErrorBoundary>
         ) : (
           <DummyBox />

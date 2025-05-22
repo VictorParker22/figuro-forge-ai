@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ interface ModelViewerProps {
   isLoading: boolean;
   progress?: number;
   errorMessage?: string | null;
-  onCustomModelLoad?: (url: string) => void;
+  onCustomModelLoad?: (url: string, file: File) => void;
 }
 
 const ModelViewer = ({ 
@@ -28,6 +29,7 @@ const ModelViewer = ({
   const [modelLoadAttempted, setModelLoadAttempted] = useState(false);
   const [customFile, setCustomFile] = useState<File | null>(null);
   const [customModelUrl, setCustomModelUrl] = useState<string | null>(null);
+  const [customModelBlob, setCustomModelBlob] = useState<Blob | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   // Keep track of original URL for downloads
@@ -41,6 +43,7 @@ const ModelViewer = ({
       originalUrlRef.current = modelUrl;
       // Reset custom model when a new model is provided
       setCustomModelUrl(null);
+      setCustomModelBlob(null);
       setCustomFile(null);
     }
   }, [modelUrl]);
@@ -67,10 +70,11 @@ const ModelViewer = ({
 
     console.log("Selected file:", file.name, "size:", file.size);
     setCustomFile(file);
+    setCustomModelBlob(file);
     
-    // Create blob URL for the file
+    // Create a temporary URL for download functionality
     const objectUrl = URL.createObjectURL(file);
-    console.log("Created blob URL:", objectUrl);
+    console.log("Created temporary URL for download:", objectUrl);
     setCustomModelUrl(objectUrl);
     setModelError(null);
     setModelLoadAttempted(false);
@@ -82,7 +86,7 @@ const ModelViewer = ({
     
     // Call the callback if provided
     if (onCustomModelLoad) {
-      onCustomModelLoad(objectUrl);
+      onCustomModelLoad(objectUrl, file);
     }
   };
 
@@ -152,6 +156,7 @@ const ModelViewer = ({
 
   // Determine which URL to use for the 3D model - custom uploaded model takes priority
   const displayModelUrl = customModelUrl || modelUrl;
+  const displayModelBlob = customModelBlob;
 
   return (
     <motion.div
@@ -201,7 +206,8 @@ const ModelViewer = ({
           <ErrorView errorMessage={errorMessage || modelError} displayModelUrl={displayModelUrl} />
         ) : (
           <ModelScene 
-            modelUrl={displayModelUrl} 
+            modelUrl={displayModelBlob ? null : displayModelUrl}
+            modelBlob={displayModelBlob}
             autoRotate={autoRotate} 
             onModelError={handleModelError}
           />

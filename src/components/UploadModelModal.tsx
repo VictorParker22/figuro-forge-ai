@@ -97,13 +97,13 @@ const UploadModelModal = ({ isOpen, onOpenChange, onModelUpload }: UploadModelMo
     setIsLoading(true);
     
     try {
-      console.log("Creating blob URL for file:", selectedFile.name);
+      console.log("Processing file for upload:", selectedFile.name);
       
-      // Create blob URL for the file
+      // Create temporary blob URL for download functionality
       const objectUrl = URL.createObjectURL(selectedFile);
-      console.log("Created blob URL for upload:", objectUrl);
+      console.log("Created temporary URL for model:", objectUrl);
       
-      // Small timeout to ensure the blob URL is ready
+      // Small timeout to ensure UI updates
       setTimeout(() => {
         onModelUpload(objectUrl, selectedFile);
         

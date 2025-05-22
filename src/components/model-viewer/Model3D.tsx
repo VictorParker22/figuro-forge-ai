@@ -7,38 +7,30 @@ import { useToast } from "@/hooks/use-toast";
 import LoadingSpinner from "./LoadingSpinner";
 
 interface Model3DProps {
-  url: string;
+  modelSource: string | Blob | null;
   onError: (error: any) => void;
 }
 
-const Model3D = ({ url, onError }: Model3DProps) => {
+const Model3D = ({ modelSource, onError }: Model3DProps) => {
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<THREE.Group | null>(null);
   const { toast } = useToast();
   
-  // Add refs to track active loaders and prevent duplicate loading
+  // Refs to track resources and prevent memory leaks
   const loaderRef = useRef<GLTFLoader | null>(null);
   const isLoadingRef = useRef<boolean>(false);
-  const prevUrlRef = useRef<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    console.log("Model3D: Effect triggered with URL:", url);
+    console.log("Model3D: Effect triggered with source:", 
+      typeof modelSource === 'string' ? modelSource : 'Blob object');
     
-    // Don't attempt to load if no URL is provided
-    if (!url) {
-      console.log("No URL provided, skipping load");
+    // Don't attempt to load if no source is provided
+    if (!modelSource) {
+      console.log("No model source provided, skipping load");
       return;
     }
-    
-    // Prevent loading the same URL multiple times
-    if (url === prevUrlRef.current && isLoadingRef.current) {
-      console.log("Skipping duplicate load request for:", url);
-      return;
-    }
-    
-    console.log("Loading model from URL:", url);
-    prevUrlRef.current = url;
     
     // Create new abort controller for this load operation
     if (controllerRef.current) {
@@ -57,126 +49,73 @@ const Model3D = ({ url, onError }: Model3DProps) => {
     
     const loadModel = async () => {
       try {
-        // For blob URLs
-        if (url.startsWith('blob:')) {
-          console.log("Loading blob URL:", url);
-          
-          const loadBlob = () => {
-            return new Promise<THREE.Group>((resolve, reject) => {
-              loader.load(
-                url,
-                (gltf) => {
-                  if (controllerRef.current?.signal.aborted) {
-                    console.log("Load operation was aborted");
-                    reject(new Error("Load operation aborted"));
-                    return;
-                  }
-                  console.log("Blob URL model loaded successfully");
-                  resolve(gltf.scene);
-                },
-                (progress) => {
-                  if (!controllerRef.current?.signal.aborted) {
-                    console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
-                  }
-                },
-                (error) => {
-                  if (controllerRef.current?.signal.aborted) return;
-                  console.error("Error loading blob URL model:", error);
-                  reject(error);
-                }
-              );
-            });
-          };
-          
-          try {
-            const scene = await loadBlob();
-            setModel(scene);
-            setLoading(false);
-            isLoadingRef.current = false;
-            toast({
-              title: "Model loaded",
-              description: "Custom 3D model loaded successfully",
-            });
-          } catch (error) {
-            if (controllerRef.current?.signal.aborted) return;
-            console.error("Error in blob loading process:", error);
-            onError(error);
-            setLoading(false);
-            isLoadingRef.current = false;
-          }
+        let modelUrl: string;
+        
+        // Handle different source types
+        if (typeof modelSource === 'string') {
+          // It's a URL string
+          modelUrl = modelSource;
+          console.log("Loading from URL string:", modelUrl);
         } else {
-          // For remote URLs, try direct first then fallback to proxy
-          console.log("Loading remote URL:", url);
+          // It's a Blob object, create an object URL
+          if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+            objectUrlRef.current = null;
+          }
           
-          const loadDirect = () => {
-            return new Promise<THREE.Group>((resolve, reject) => {
-              loader.load(
-                url,
-                (gltf) => {
-                  if (controllerRef.current?.signal.aborted) {
-                    console.log("Load operation was aborted");
-                    reject(new Error("Load operation aborted"));
-                    return;
-                  }
-                  console.log("Remote URL model loaded successfully");
-                  resolve(gltf.scene);
-                },
-                (progress) => {
-                  if (!controllerRef.current?.signal.aborted) {
-                    console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
-                  }
-                },
-                (error) => {
-                  if (controllerRef.current?.signal.aborted) return;
-                  console.error("Direct loading failed:", error);
-                  reject(error);
+          objectUrlRef.current = URL.createObjectURL(modelSource);
+          modelUrl = objectUrlRef.current;
+          console.log("Created and loading from object URL:", modelUrl);
+        }
+        
+        // Load the model
+        const loadWithUrl = (url: string) => {
+          return new Promise<THREE.Group>((resolve, reject) => {
+            loader.load(
+              url,
+              (gltf) => {
+                if (controllerRef.current?.signal.aborted) {
+                  console.log("Load operation was aborted");
+                  reject(new Error("Load operation aborted"));
+                  return;
                 }
-              );
-            });
-          };
-          
-          const loadWithProxy = (proxyUrl: string) => {
-            return new Promise<THREE.Group>((resolve, reject) => {
-              loader.load(
-                proxyUrl,
-                (gltf) => {
-                  if (controllerRef.current?.signal.aborted) return;
-                  console.log("Model loaded successfully with proxy");
-                  resolve(gltf.scene);
-                },
-                (progress) => {
-                  if (!controllerRef.current?.signal.aborted) {
-                    console.log(`Proxy loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
-                  }
-                },
-                (proxyError) => {
-                  if (controllerRef.current?.signal.aborted) return;
-                  console.error("Proxy loading failed:", proxyError);
-                  reject(proxyError);
+                console.log("Model loaded successfully from:", url);
+                resolve(gltf.scene);
+              },
+              (progress) => {
+                if (!controllerRef.current?.signal.aborted) {
+                  console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
                 }
-              );
-            });
-          };
+              },
+              (error) => {
+                if (controllerRef.current?.signal.aborted) return;
+                console.error("Error loading model:", error);
+                reject(error);
+              }
+            );
+          });
+        };
+        
+        try {
+          // Try direct loading
+          const scene = await loadWithUrl(modelUrl);
+          setModel(scene);
+          setLoading(false);
+          isLoadingRef.current = false;
+          toast({
+            title: "Model loaded",
+            description: "3D model loaded successfully",
+          });
+        } catch (directError) {
+          if (controllerRef.current?.signal.aborted) return;
           
-          try {
-            // First try direct loading
-            const scene = await loadDirect();
-            setModel(scene);
-            setLoading(false);
-            isLoadingRef.current = false;
-            toast({
-              title: "Model loaded",
-              description: "3D model loaded successfully",
-            });
-          } catch (directError) {
-            if (controllerRef.current?.signal.aborted) return;
-            
-            // If direct loading fails, try with CORS proxy
+          // If it's a string URL and not a blob URL, try with CORS proxy
+          if (typeof modelSource === 'string' && !modelSource.startsWith('blob:')) {
             try {
-              const proxyUrl = `https://cors-proxy.fringe.zone/${encodeURIComponent(url)}`;
+              const proxyUrl = `https://cors-proxy.fringe.zone/${encodeURIComponent(modelSource)}`;
               console.log("Trying with CORS proxy:", proxyUrl);
               
-              const scene = await loadWithProxy(proxyUrl);
+              const scene = await loadWithUrl(proxyUrl);
               setModel(scene);
               setLoading(false);
               isLoadingRef.current = false;
@@ -196,6 +135,17 @@ const Model3D = ({ url, onError }: Model3DProps) => {
                 variant: "destructive",
               });
             }
+          } else {
+            // For blob URLs, just report the error
+            console.error("Failed to load from blob URL:", directError);
+            onError(directError);
+            setLoading(false);
+            isLoadingRef.current = false;
+            toast({
+              title: "Loading failed",
+              description: "Failed to load the 3D model. The file might be corrupted.",
+              variant: "destructive",
+            });
           }
         }
       } catch (error) {
@@ -249,20 +199,21 @@ const Model3D = ({ url, onError }: Model3DProps) => {
         }
       }
       
-      isLoadingRef.current = false;
-      loaderRef.current = null;
-      
-      // Revoke blob URL if it was created in this component
-      if (url && url.startsWith('blob:') && !url.includes('model-viewer')) {
+      // Revoke object URL if we created one
+      if (objectUrlRef.current) {
         try {
-          URL.revokeObjectURL(url);
-          console.log("Revoked blob URL:", url);
+          URL.revokeObjectURL(objectUrlRef.current);
+          console.log("Revoked object URL:", objectUrlRef.current);
+          objectUrlRef.current = null;
         } catch (error) {
-          console.error("Error revoking blob URL:", error);
+          console.error("Error revoking object URL:", error);
         }
       }
+      
+      isLoadingRef.current = false;
+      loaderRef.current = null;
     };
-  }, [url, onError, toast]);
+  }, [modelSource, onError, toast, model]);
   
   if (loading) {
     return <LoadingSpinner />;
