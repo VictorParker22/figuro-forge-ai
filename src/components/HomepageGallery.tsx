@@ -35,16 +35,29 @@ const HomepageGallery: React.FC = () => {
     navigate("/studio");
   };
   
-  // Handle downloads (if needed)
-  const handleDownload = (imageUrl: string, imageName: string) => {
-    if (!imageUrl) return;
-    
-    const a = document.createElement('a');
-    a.href = imageUrl;
-    a.download = imageName || 'figurine.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  // Handle downloads with a proper function that ensures content is downloaded
+  const handleDownload = async (imageUrl: string, imageName: string) => {
+    try {
+      // Fetch the file as a blob
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      // Create an object URL for the blob
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = imageName || 'figurine.png';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+    }
   };
 
   return (
@@ -113,13 +126,31 @@ const HomepageGallery: React.FC = () => {
                         </span>
                       </div>
                       
-                      {file.type === '3d-model' && (
+                      {file.type === '3d-model' ? (
+                        <div className="flex flex-col gap-2 w-full">
+                          <Button
+                            onClick={() => handleViewModel(file.url)}
+                            size="sm"
+                            className="w-full bg-figuro-accent hover:bg-figuro-accent-hover h-8 px-3"
+                          >
+                            <Eye size={14} className="mr-1.5" /> View Model
+                          </Button>
+                          <Button
+                            onClick={() => handleDownload(file.url, file.name)}
+                            size="sm"
+                            variant="outline"
+                            className="w-full border-white/10 h-8 px-3"
+                          >
+                            <Download size={14} className="mr-1.5" /> Download
+                          </Button>
+                        </div>
+                      ) : (
                         <Button
-                          onClick={() => handleViewModel(file.url)}
+                          onClick={() => handleDownload(file.url, file.name)}
                           size="sm"
                           className="w-full bg-figuro-accent hover:bg-figuro-accent-hover h-8 px-3"
                         >
-                          <Eye size={14} className="mr-1.5" /> View Model
+                          <Download size={14} className="mr-1.5" /> Download
                         </Button>
                       )}
                     </div>

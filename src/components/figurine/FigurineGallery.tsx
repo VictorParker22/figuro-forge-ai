@@ -15,17 +15,36 @@ const FigurineGallery = () => {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const { toast } = useToast();
 
-  const handleDownload = (figurine: Figurine) => {
+  const handleDownload = async (figurine: Figurine) => {
     const imageUrl = figurine.saved_image_url || figurine.image_url;
     if (!imageUrl) return;
     
-    // Create a temporary anchor element
-    const a = document.createElement('a');
-    a.href = imageUrl;
-    a.download = `figurine-${figurine.id}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      // Fetch the image data as a blob
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      // Create an object URL for the blob
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element and trigger the download
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `figurine-${figurine.id}.png`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    } catch (error) {
+      console.error("Error downloading figurine:", error);
+      toast({
+        title: "Download failed",
+        description: "There was a problem downloading the figurine image",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleViewModel = (figurine: Figurine) => {
