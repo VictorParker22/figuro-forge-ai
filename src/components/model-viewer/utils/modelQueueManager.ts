@@ -2,7 +2,7 @@
 import * as THREE from "three";
 
 // Configure the queue
-const MAX_CONCURRENT_LOADS = 2;
+const DEFAULT_MAX_CONCURRENT_LOADS = 2;
 const QUEUE_TIMEOUT_MS = 60000; // 1 minute timeout for queued items
 
 interface QueueItem {
@@ -18,10 +18,51 @@ class ModelQueueManager {
   private activeLoads: Map<string, boolean> = new Map();
   private abortRequests: Set<string> = new Set();
   private timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  private maxConcurrent: number = DEFAULT_MAX_CONCURRENT_LOADS;
   
   constructor() {
     console.log("[ModelQueueManager] Initialized");
     // Set up periodic cleanup of stale queue items
+    this.startQueueMonitoring();
+  }
+  
+  /**
+   * Set the maximum number of concurrent model loads
+   * @param limit The maximum number of concurrent loads
+   */
+  public setMaxConcurrent(limit: number): void {
+    if (limit < 1) {
+      console.warn("[ModelQueueManager] Invalid concurrent limit, using default");
+      this.maxConcurrent = DEFAULT_MAX_CONCURRENT_LOADS;
+    } else {
+      this.maxConcurrent = limit;
+      console.log(`[ModelQueueManager] Set max concurrent loads to ${limit}`);
+    }
+    
+    // Process the queue in case we increased the limit
+    this.processNextInQueue();
+  }
+  
+  /**
+   * Reset the queue manager, cleaning up all resources
+   */
+  public reset(): void {
+    console.log("[ModelQueueManager] Resetting queue manager");
+    
+    // Reject all pending loads
+    this.queue.forEach(item => {
+      item.reject(new Error("Queue manager reset"));
+    });
+    
+    this.queue = [];
+    this.activeLoads.clear();
+    this.abortRequests.clear();
+    this.maxConcurrent = DEFAULT_MAX_CONCURRENT_LOADS;
+    
+    // Restart monitoring
+    if (this.timeoutHandle) {
+      clearInterval(this.timeoutHandle);
+    }
     this.startQueueMonitoring();
   }
   
@@ -84,7 +125,7 @@ class ModelQueueManager {
       };
       
       // If under concurrent limit, process immediately
-      if (this.activeLoads.size < MAX_CONCURRENT_LOADS) {
+      if (this.activeLoads.size < this.maxConcurrent) {
         this.processLoadItem(queueItem);
       } else {
         // Queue the load
@@ -126,7 +167,7 @@ class ModelQueueManager {
   
   private processNextInQueue() {
     // If we have capacity and queued items, process the next one
-    if (this.activeLoads.size < MAX_CONCURRENT_LOADS && this.queue.length > 0) {
+    if (this.activeLoads.size < this.maxConcurrent && this.queue.length > 0) {
       const nextItem = this.queue.shift()!;
       
       // Check if this item should be aborted

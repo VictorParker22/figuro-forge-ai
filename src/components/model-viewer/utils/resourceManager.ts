@@ -1,6 +1,33 @@
 
 import * as THREE from "three";
 
+// Maximum number of WebGL contexts that browsers typically support
+const MAX_WEBGL_CONTEXTS = 16;
+
+/**
+ * Simple tracker for WebGL contexts to help prevent creating too many
+ */
+export const webGLContextTracker = {
+  activeContexts: 0,
+  
+  // Register a new context
+  registerContext() {
+    this.activeContexts += 1;
+    console.log(`[WebGLContextTracker] Registered context, total: ${this.activeContexts}`);
+  },
+  
+  // Release a context
+  releaseContext() {
+    this.activeContexts = Math.max(0, this.activeContexts - 1);
+    console.log(`[WebGLContextTracker] Released context, remaining: ${this.activeContexts}`);
+  },
+  
+  // Check if we're nearing the limit of WebGL contexts
+  isNearingLimit() {
+    return this.activeContexts >= MAX_WEBGL_CONTEXTS * 0.75; // Warning at 75% of max
+  }
+};
+
 /**
  * Recursively dispose of Three.js resources to prevent memory leaks
  * @param object The object to dispose
