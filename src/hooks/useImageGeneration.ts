@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
@@ -152,40 +153,65 @@ export const useImageGeneration = () => {
             setConversionProgress(100);
             setConversionError(null);
             
-            // Attempt to download and save the model to our storage
+            // Get the prompt if we have a figurine ID
+            let prompt = "";
             if (currentFigurineId) {
-              // Start downloading and saving the model asynchronously
+              try {
+                const { data: figurineData } = await supabase
+                  .from('figurines')
+                  .select('prompt')
+                  .eq('id', currentFigurineId)
+                  .single();
+                  
+                if (figurineData) {
+                  prompt = figurineData.prompt;
+                }
+              } catch (error) {
+                console.error("Error fetching figurine data:", error);
+              }
+            }
+            
+            // Start downloading and saving the model asynchronously
+            toast({
+              title: "3D model created",
+              description: "Downloading and saving your 3D model...",
+            });
+            
+            // Download and save the model to our storage with metadata
+            const storedModelUrl = await downloadAndSaveModel(
+              data.modelUrl, 
+              `figurine_${prompt ? prompt.substring(0, 20) : "untitled"}`,
+              {
+                sourceImageUrl: generatedImage || undefined,
+                prompt: prompt || undefined,
+                figurineId: currentFigurineId || undefined,
+                isStandalone: !currentFigurineId
+              }
+            );
+            
+            if (storedModelUrl) {
+              // Update the model URL to our stored version
+              setModelUrl(storedModelUrl);
+              
+              // Update figurine with the stored model URL if we have a figurineId
+              if (currentFigurineId) {
+                await updateFigurineWithModelUrl(currentFigurineId, storedModelUrl);
+              }
+              
+              toast({
+                title: "3D model saved",
+                description: "Your model is ready to view in 3D and has been added to your gallery",
+              });
+            } else {
+              // Fallback to the external URL if storage failed
+              if (currentFigurineId) {
+                await updateFigurineWithModelUrl(currentFigurineId, data.modelUrl);
+              }
+              
               toast({
                 title: "3D model created",
-                description: "Downloading and saving your 3D model...",
+                description: "Your figurine is ready to view in 3D (using external hosting)",
               });
-              
-              // Download and save the model to our storage
-              const storedModelUrl = await downloadAndSaveModel(
-                data.modelUrl, 
-                `figurine_${currentFigurineId}`
-              );
-              
-              if (storedModelUrl) {
-                // Update the model URL to our stored version
-                setModelUrl(storedModelUrl);
-                
-                // Update figurine with the stored model URL
-                await updateFigurineWithModelUrl(currentFigurineId, storedModelUrl);
-                
-                toast({
-                  title: "3D model saved",
-                  description: "Your figurine is ready to view in 3D",
-                });
-              } else {
-                // Fallback to the external URL if storage failed
-                await updateFigurineWithModelUrl(currentFigurineId, data.modelUrl);
-                
-                toast({
-                  title: "3D model created",
-                  description: "Your figurine is ready to view in 3D (using external hosting)",
-                });
-              }
             }
           } catch (saveError) {
             console.error("Error saving model:", saveError);

@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Eye } from "lucide-react";
+import { Download, Eye, Cube } from "lucide-react";
 import ModelPlaceholder from "./ModelPlaceholder";
 import ModelPreview from "./ModelPreview";
 
@@ -33,6 +33,34 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
     setPreviewFailed(true);
   };
 
+  // Extract model name for display
+  const getDisplayName = () => {
+    let name = file.name;
+    
+    // Remove timestamp suffix and extension for cleaner display
+    if (name.includes('.')) {
+      name = name.split('.')[0]; // Remove extension
+    }
+    
+    // Cleanup standalone model names
+    if (name.includes('standalone')) {
+      const parts = name.split('/');
+      if (parts.length > 2) {
+        // Take the filename part after "standalone/"
+        name = parts[2];
+      }
+    }
+    
+    // Remove timestamp suffix (common format: name_123456789)
+    name = name.replace(/_\d{10,}$/, '');
+    
+    // Replace underscores with spaces
+    name = name.replace(/_/g, ' ');
+    
+    // Capitalize first letter
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  };
+
   return (
     <div className="glass-panel rounded-lg overflow-hidden group">
       <div className="aspect-square relative overflow-hidden bg-white/5">
@@ -50,11 +78,15 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
                 <ModelPreview 
                   modelUrl={file.url} 
                   fileName={file.name} 
+                  onError={handlePreviewFailed}
                 />
               </div>
             ) : (
               <ModelPlaceholder fileName={file.name} />
             )}
+            <div className="absolute top-2 right-2 bg-figuro-accent/80 rounded-full p-1.5">
+              <Cube size={16} />
+            </div>
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
@@ -85,6 +117,9 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
             )}
           </div>
         </div>
+      </div>
+      <div className="p-3 text-sm truncate">
+        {getDisplayName()}
       </div>
     </div>
   );
