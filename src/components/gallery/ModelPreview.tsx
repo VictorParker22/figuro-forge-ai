@@ -22,15 +22,26 @@ const ModelContent = ({
   isVisible: boolean 
 }) => {
   // Create a stable ID based on the URL to prevent reloads
-  const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}`);
+  const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}-${Date.now().toString(36).substring(2, 6)}`);
   
-  console.log(`ModelContent: Loading ${modelUrl}, visible: ${isVisible}, id: ${modelIdRef.current}`);
+  console.log(`[ModelContent] Loading ${modelUrl}, visible: ${isVisible}, id: ${modelIdRef.current}`);
+  
+  // Add cache buster to Supabase URLs
+  const processedUrl = useMemo(() => {
+    if (modelUrl && modelUrl.includes('supabase.co/storage/v1/object/public')) {
+      const cacheBuster = `cb=${Date.now()}`;
+      return modelUrl.includes('?') 
+        ? `${modelUrl}&${cacheBuster}` 
+        : `${modelUrl}?${cacheBuster}`;
+    }
+    return modelUrl;
+  }, [modelUrl]);
   
   const { loading, model, error } = useOptimizedModelLoader({ 
-    modelSource: modelUrl, 
+    modelSource: processedUrl, 
     visible: isVisible,
     modelId: modelIdRef.current,
-    onError: (err) => console.error(`Error loading model ${modelUrl}:`, err)
+    onError: (err) => console.error(`[ModelContent] Error loading model ${modelUrl}:`, err)
   });
   
   if (loading) {
@@ -38,7 +49,7 @@ const ModelContent = ({
   }
   
   if (error || !model) {
-    console.error(`Failed to load model: ${modelUrl}`, error);
+    console.error(`[ModelContent] Failed to load model: ${modelUrl}`, error);
     return <DummyBox />;
   }
   
@@ -57,19 +68,27 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   
   // Clean URL from query params for better caching
   const cleanModelUrl = useMemo(() => {
-    const url = new URL(modelUrl);
-    // Keep only necessary query parameters if any
-    return url.toString();
+    try {
+      // Only clean non-Supabase URLs (we want to keep query params for Supabase)
+      if (!modelUrl.includes('supabase.co')) {
+        const url = new URL(modelUrl);
+        // Strip query parameters
+        return url.origin + url.pathname;
+      }
+    } catch (e) {
+      // If URL parsing fails, return the original
+    }
+    return modelUrl;
   }, [modelUrl]);
   
   // Handle errors silently by showing the placeholder
   const handleError = (error: any) => {
-    console.error(`ModelPreview error for ${fileName}:`, error);
+    console.error(`[ModelPreview] Error for ${fileName}:`, error);
     setHasError(true);
   };
 
   useEffect(() => {
-    console.log(`ModelPreview ${fileName}: ${isIntersecting ? 'visible' : 'not visible'}, ever visible: ${wasEverVisible}`);
+    console.log(`[ModelPreview] ${fileName}: ${isIntersecting ? 'visible' : 'not visible'}, ever visible: ${wasEverVisible}`);
   }, [isIntersecting, wasEverVisible, fileName]);
 
   if (hasError) {
@@ -77,7 +96,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   }
 
   // Create unique ID for this preview canvas to avoid conflicts
-  const canvasId = useRef(`canvas-${fileName.replace(/\W/g, '')}-${Math.random().toString(36).substring(2, 10)}`);
+  const canvasId = useRef(`canvas-${fileName.replace(/\W/g, '')}-${Date.now().toString(36).substring(2, 10)}`);
 
   return (
     <div className="w-full h-full" ref={targetRef as React.RefObject<HTMLDivElement>}>

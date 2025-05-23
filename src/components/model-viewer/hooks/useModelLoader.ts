@@ -24,7 +24,6 @@ export const useModelLoader = ({
   const { toast } = useToast();
   
   // Refs to track resources and prevent memory leaks
-  const isLoadingRef = useRef<boolean>(false);
   const controllerRef = useRef<AbortController | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const modelIdRef = useRef<string>(
@@ -34,13 +33,49 @@ export const useModelLoader = ({
   // Add refs to track current source to prevent infinite loops
   const currentSourceRef = useRef<string | Blob | null>(null);
   const loadAttemptRef = useRef<number>(0);
+  const mountedRef = useRef(true);
+  
+  // Clean up function to handle abort and resource cleanup
+  const cleanup = () => {
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+      controllerRef.current = null;
+    }
+    
+    if (objectUrlRef.current) {
+      revokeObjectUrl(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    
+    // Also abort any queued loads
+    if (modelIdRef.current) {
+      modelQueueManager.abortModelLoad(modelIdRef.current);
+    }
+  };
 
   useEffect(() => {
-    console.log(`useModelLoader: Effect triggered for ${modelIdRef.current}`);
+    console.log(`[useModelLoader] Effect triggered for ${modelIdRef.current}`);
+    mountedRef.current = true;
+    
+    // Cleanup on unmount
+    return () => {
+      console.log(`[useModelLoader] Component unmounting for ${modelIdRef.current}`);
+      mountedRef.current = false;
+      cleanup();
+      
+      // Clean up the model if it exists
+      if (model) {
+        cleanupResources(model);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    console.log(`[useModelLoader] Source change effect for ${modelIdRef.current}`);
     
     // Skip effect if no source provided
     if (!modelSource && !modelBlob) {
-      console.log(`No model source provided for ${modelIdRef.current}, skipping load`);
+      console.log(`[useModelLoader] No source provided for ${modelIdRef.current}, skipping load`);
       setLoading(false);
       return;
     }
@@ -50,37 +85,31 @@ export const useModelLoader = ({
     const sourceKey = modelBlob ? 'blob-source' : modelSource;
     
     if (sourceKey === currentSourceRef.current && model) {
-      console.log(`Same model source detected for ${modelIdRef.current}, skipping reload`);
+      console.log(`[useModelLoader] Same model source detected for ${modelIdRef.current}, skipping reload`);
       return;
     }
     
     // Limit load attempts to prevent infinite loops
     if (loadAttemptRef.current > 3) {
-      console.log(`Too many load attempts for ${modelIdRef.current}, aborting`);
+      console.log(`[useModelLoader] Too many load attempts for ${modelIdRef.current}, aborting`);
       setLoading(false);
       onError(new Error("Too many load attempts"));
       return;
     }
     
     loadAttemptRef.current += 1;
-    console.log(`Load attempt ${loadAttemptRef.current} for ${modelIdRef.current}`);
+    console.log(`[useModelLoader] Load attempt ${loadAttemptRef.current} for ${modelIdRef.current}`);
     
     // Update current source reference
     currentSourceRef.current = sourceKey;
     
-    // Abort previous load if in progress
-    if (controllerRef.current) {
-      console.log(`Aborting previous load operation for ${modelIdRef.current}`);
-      controllerRef.current.abort();
-      
-      // Also abort any queued load
-      modelQueueManager.abortModelLoad(modelIdRef.current);
-    }
+    // Abort previous load and clean up resources
+    cleanup();
     
     // Clean up previous model resources
     if (model) {
-      console.log(`Cleaning up previous model resources for ${modelIdRef.current}`);
-      cleanupResources(model, objectUrlRef.current, controllerRef.current);
+      console.log(`[useModelLoader] Cleaning up previous model resources for ${modelIdRef.current}`);
+      cleanupResources(model);
       setModel(null);
     }
     
@@ -89,12 +118,20 @@ export const useModelLoader = ({
     
     // Set loading state
     setLoading(true);
-    isLoadingRef.current = true;
+    
+    // Process the URL if it's from Supabase storage
+    let modelUrl = modelSource;
+    if (modelSource && modelSource.includes('supabase.co/storage/v1/object/public')) {
+      // Add cache buster to Supabase URLs
+      const cacheBuster = `cb=${Date.now()}`;
+      modelUrl = modelSource.includes('?') 
+        ? `${modelSource}&${cacheBuster}` 
+        : `${modelSource}?${cacheBuster}`;
+      console.log(`[useModelLoader] Added cache buster to Supabase URL: ${modelUrl}`);
+    }
     
     const loadModel = async () => {
       try {
-        let modelUrl: string;
-        
         // Handle different source types
         if (modelBlob) {
           // It's a Blob object, create an object URL
@@ -105,54 +142,55 @@ export const useModelLoader = ({
           
           objectUrlRef.current = createObjectUrl(modelBlob);
           modelUrl = objectUrlRef.current;
-          console.log(`Created object URL for ${modelIdRef.current}: ${modelUrl}`);
-        } else if (typeof modelSource === 'string') {
-          // It's a URL string
-          modelUrl = modelSource;
-          console.log(`Loading from URL string for ${modelIdRef.current}: ${modelUrl}`);
-        } else {
-          console.log(`Invalid model source for ${modelIdRef.current}`);
+          console.log(`[useModelLoader] Created object URL for ${modelIdRef.current}: ${modelUrl}`);
+        } else if (!modelUrl) {
+          console.log(`[useModelLoader] Invalid model source for ${modelIdRef.current}`);
           setLoading(false);
-          isLoadingRef.current = false;
           return;
         }
         
-        // Queue the model load
+        // Queue the model load with proper timeout
+        console.log(`[useModelLoader] Starting to load model from ${modelUrl}`);
         const loadedModel = await modelQueueManager.queueModelLoad(
           modelIdRef.current,
-          () => loadModelWithFallback(modelUrl, {
+          () => loadModelWithFallback(modelUrl!, {
             signal: controllerRef.current?.signal,
+            timeout: 20000, // 20 second timeout
             onProgress: (progress) => {
-              // Optional progress tracking
               const percent = Math.round((progress.loaded / progress.total) * 100);
-              if (percent % 25 === 0) { // Log only at 0%, 25%, 50%, 75%, 100%
-                console.log(`Loading progress for ${modelIdRef.current}: ${percent}%`);
+              if (percent % 20 === 0) { // Log at 0%, 20%, 40%, etc.
+                console.log(`[useModelLoader] Loading progress for ${modelIdRef.current}: ${percent}%`);
               }
             }
           })
         );
         
-        if (controllerRef.current?.signal.aborted) {
-          console.log(`Load operation was aborted for ${modelIdRef.current}`);
+        if (!mountedRef.current) {
+          console.log(`[useModelLoader] Component unmounted during load for ${modelIdRef.current}`);
           return;
         }
         
+        if (controllerRef.current?.signal.aborted) {
+          console.log(`[useModelLoader] Load operation was aborted for ${modelIdRef.current}`);
+          return;
+        }
+        
+        console.log(`[useModelLoader] Model ${modelIdRef.current} loaded successfully`);
         setModel(loadedModel);
         setLoading(false);
-        isLoadingRef.current = false;
         loadAttemptRef.current = 0; // Reset counter on success
-        console.log(`Model ${modelIdRef.current} loaded successfully`);
         
       } catch (error) {
+        if (!mountedRef.current) return;
+        
         if (controllerRef.current?.signal.aborted) {
-          console.log(`Error ignored due to abort for ${modelIdRef.current}`);
+          console.log(`[useModelLoader] Error ignored due to abort for ${modelIdRef.current}`);
           return;
         }
         
-        console.error(`Failed to load model ${modelIdRef.current}:`, error);
+        console.error(`[useModelLoader] Failed to load model ${modelIdRef.current}:`, error);
         onError(error);
         setLoading(false);
-        isLoadingRef.current = false;
       }
     };
     
@@ -160,26 +198,10 @@ export const useModelLoader = ({
     
     // Cleanup function
     return () => {
-      if (controllerRef.current) {
-        controllerRef.current.abort();
-      }
-      
-      // Don't dispose the model here - let the component using it handle disposal
-      // Just clean up the controller and URL
-      if (objectUrlRef.current && modelBlob) {
-        revokeObjectUrl(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
+      console.log(`[useModelLoader] Source effect cleanup for ${modelIdRef.current}`);
+      cleanup();
     };
-  }, [modelSource, modelBlob, onError, model]);
-  
-  // Clean up all resources when unmounting
-  useEffect(() => {
-    return () => {
-      cleanupResources(model, objectUrlRef.current, controllerRef.current);
-      console.log(`Cleaned up resources on unmount for ${modelIdRef.current}`);
-    };
-  }, []);
+  }, [modelSource, modelBlob, onError]);
   
   return { loading, model };
 };
