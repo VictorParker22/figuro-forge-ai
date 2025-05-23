@@ -51,6 +51,36 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_limits: {
+        Row: {
+          features: Json | null
+          id: string
+          image_generations_limit: number
+          is_unlimited: boolean | null
+          model_conversions_limit: number
+          plan_type: string
+          price_monthly: number
+        }
+        Insert: {
+          features?: Json | null
+          id?: string
+          image_generations_limit: number
+          is_unlimited?: boolean | null
+          model_conversions_limit: number
+          plan_type: string
+          price_monthly: number
+        }
+        Update: {
+          features?: Json | null
+          id?: string
+          image_generations_limit?: number
+          is_unlimited?: boolean | null
+          model_conversions_limit?: number
+          plan_type?: string
+          price_monthly?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -96,14 +126,85 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          additional_conversions: number | null
+          commercial_license: boolean | null
+          created_at: string | null
+          id: string
+          plan_type: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string
+          valid_until: string | null
+        }
+        Insert: {
+          additional_conversions?: number | null
+          commercial_license?: boolean | null
+          created_at?: string | null
+          id?: string
+          plan_type?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          valid_until?: string | null
+        }
+        Update: {
+          additional_conversions?: number | null
+          commercial_license?: boolean | null
+          created_at?: string | null
+          id?: string
+          plan_type?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
+      user_usage: {
+        Row: {
+          id: string
+          image_generations_used: number | null
+          model_conversions_used: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          image_generations_used?: number | null
+          model_conversions_used?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          image_generations_used?: number | null
+          model_conversions_used?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_user_limits: {
+        Args: { action_type: string }
+        Returns: boolean
+      }
       increment_stat: {
         Args: { stat_id: string; inc_amount?: number }
         Returns: number
+      }
+      increment_usage: {
+        Args: { action_type: string }
+        Returns: boolean
       }
     }
     Enums: {
