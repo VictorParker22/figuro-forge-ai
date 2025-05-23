@@ -1,4 +1,3 @@
-
 import { formatStylePrompt } from "@/lib/huggingface";
 import { SUPABASE_PUBLISHABLE_KEY, supabase } from "@/integrations/supabase/client";
 import { generateImageWithEdge } from "@/lib/edgeFunction";
@@ -34,37 +33,77 @@ const setEdgeFunctionStatus = (isAvailable: boolean): void => {
 // Increment the global stats counter
 const incrementImageGenerationCount = async (): Promise<void> => {
   try {
-    // First try to use the increment edge function
-    const response = await fetch(`${window.location.origin}/functions/v1/increment`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY || ''}`
-      },
-      body: JSON.stringify({ 
-        table_name: 'stats',
-        id: 'image_generations',
-      }),
-    });
+    console.log("Incrementing image generation count...");
     
-    // If the function call failed, try to increment directly using the Supabase client
-    if (!response.ok) {
-      console.warn("Failed to increment counter via edge function, trying direct method");
+    // First try to use the increment edge function
+    try {
+      const response = await fetch(`${window.location.origin}/functions/v1/increment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY || ''}`
+        },
+        body: JSON.stringify({ 
+          table_name: 'stats',
+          id: 'image_generations',
+        }),
+      });
       
-      // Try to update using the RPC function
-      const { data, error } = await supabase
-        .rpc('increment_stat', {
-          stat_id: 'image_generations',
-          inc_amount: 1
-        });
-        
-      if (error) {
-        throw new Error(`Failed to increment counter: ${error.message}`);
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Successfully incremented counter via edge function:", result);
+        return;
       }
+      
+      console.warn("Failed to increment counter via edge function, status:", response.status);
+    } catch (edgeFunctionError) {
+      console.error("Edge function error:", edgeFunctionError);
     }
+    
+    // If the edge function fails, try the RPC function directly
+    console.log("Trying to increment counter via RPC function...");
+    const { data, error } = await supabase
+      .rpc('increment_stat', {
+        stat_id: 'image_generations',
+        inc_amount: 1
+      });
+      
+    if (error) {
+      throw new Error(`Failed to increment counter: ${error.message}`);
+    }
+    
+    console.log("Successfully incremented counter via RPC function:", data);
   } catch (error) {
     console.error("Failed to increment generation counter:", error);
-    // Silently fail - don't block the rest of the application for counter issues
+    
+    // Last resort: try a direct update if the RPC function fails
+    try {
+      console.log("Attempting direct update as fallback...");
+      
+      // First check if record exists
+      const { data: existingData } = await supabase
+        .from('stats')
+        .select('count')
+        .eq('id', 'image_generations')
+        .maybeSingle();
+      
+      if (existingData) {
+        // Update existing record
+        await supabase
+          .from('stats')
+          .update({ count: existingData.count + 1, updated_at: new Date().toISOString() })
+          .eq('id', 'image_generations');
+      } else {
+        // Create new record
+        await supabase
+          .from('stats')
+          .insert({ id: 'image_generations', count: 1 });
+      }
+      
+      console.log("Direct update completed");
+    } catch (updateError) {
+      console.error("Even direct update failed:", updateError);
+    }
   }
 };
 
@@ -165,6 +204,7 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
     
     // If edge function isn't available or failed, use direct API
     console.log("Using direct API call via edgeFunction.ts...");
+    
     const edgeResult = await generateImageWithEdge({
       prompt,
       style, 

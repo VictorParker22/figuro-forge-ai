@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -25,6 +26,8 @@ serve(async (req) => {
     
     // If table_name is 'stats', increment the stat using the increment_stat function
     if (table_name === 'stats') {
+      console.log(`Incrementing stat ${id} by ${inc_amount}`);
+      
       const response = await fetch(`${supabaseUrl}/rest/v1/rpc/increment_stat`, {
         method: 'POST',
         headers: {
@@ -39,7 +42,9 @@ serve(async (req) => {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to increment stat: ${await response.text()}`);
+        const errorText = await response.text();
+        console.error(`Failed to increment stat: Status ${response.status}, ${errorText}`);
+        throw new Error(`Failed to increment stat: ${errorText}`);
       }
       
       const result = await response.json();
@@ -68,7 +73,9 @@ serve(async (req) => {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to increment: ${await response.text()}`);
+      const errorText = await response.text();
+      console.error(`Failed to increment: Status ${response.status}, ${errorText}`);
+      throw new Error(`Failed to increment: ${errorText}`);
     }
     
     const result = await response.json();
@@ -106,7 +113,7 @@ serve(async (req) => {
         success: false, 
         error: error instanceof Error ? error.message : "An unknown error occurred"
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

@@ -10,7 +10,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.stats WHERE id = stat_id) THEN
     -- Create the record if it doesn't exist
     INSERT INTO public.stats (id, count)
-    VALUES (stat_id, 0);
+    VALUES (stat_id, inc_amount)
+    RETURNING count INTO result;
+    RETURN result;
   END IF;
 
   -- Update the stats counter and return new value  
