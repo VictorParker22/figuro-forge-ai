@@ -1,3 +1,4 @@
+
 import { formatStylePrompt } from "@/lib/huggingface";
 import { SUPABASE_PUBLISHABLE_KEY, supabase } from "@/integrations/supabase/client";
 import { generateImageWithEdge } from "@/lib/edgeFunction";
@@ -33,7 +34,8 @@ const setEdgeFunctionStatus = (isAvailable: boolean): void => {
 // Increment the global stats counter
 const incrementImageGenerationCount = async (): Promise<void> => {
   try {
-    await fetch(`${window.location.origin}/functions/v1/increment`, {
+    // First try to use the increment edge function
+    const response = await fetch(`${window.location.origin}/functions/v1/increment`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -44,8 +46,25 @@ const incrementImageGenerationCount = async (): Promise<void> => {
         id: 'image_generations',
       }),
     });
+    
+    // If the function call failed, try to increment directly using the Supabase client
+    if (!response.ok) {
+      console.warn("Failed to increment counter via edge function, trying direct method");
+      
+      // Try to update using the RPC function
+      const { data, error } = await supabase
+        .rpc('increment_stat', {
+          stat_id: 'image_generations',
+          inc_amount: 1
+        });
+        
+      if (error) {
+        throw new Error(`Failed to increment counter: ${error.message}`);
+      }
+    }
   } catch (error) {
     console.error("Failed to increment generation counter:", error);
+    // Silently fail - don't block the rest of the application for counter issues
   }
 };
 

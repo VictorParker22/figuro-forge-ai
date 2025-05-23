@@ -15,51 +15,65 @@ const GenerationCounter: React.FC<GenerationCounterProps> = ({ className }) => {
   useEffect(() => {
     // Fetch the initial count
     const fetchInitialCount = async () => {
-      const { data, error } = await supabase
-        .from('stats')
-        .select('count')
-        .eq('id', 'image_generations')
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from('stats')
+          .select('count')
+          .eq('id', 'image_generations')
+          .maybeSingle();
 
-      if (data && !error) {
-        setCount(data.count);
-      } else {
-        console.error("Error fetching generation count:", error);
+        if (data && !error) {
+          setCount(data.count);
+        } else if (error) {
+          console.error("Error fetching generation count:", error);
+        }
+      } catch (err) {
+        console.error("Failed to fetch generation count:", err);
       }
     };
 
     fetchInitialCount();
 
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on('postgres_changes', 
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'stats',
-          filter: 'id=eq.image_generations'
-        }, 
-        (payload) => {
-          const newCount = payload.new.count;
-          
-          // Only animate if the count actually increased
-          if (newCount > count) {
-            setIsAnimating(true);
-            setTimeout(() => setIsAnimating(false), 1000);
-            setCount(newCount);
+    // Set up real-time subscription with error handling
+    try {
+      const channel = supabase
+        .channel('schema-db-changes')
+        .on('postgres_changes', 
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'stats',
+            filter: 'id=eq.image_generations'
+          }, 
+          (payload) => {
+            if (payload && payload.new && typeof payload.new.count === 'number') {
+              const newCount = payload.new.count;
+              
+              // Only animate if the count actually increased
+              if (newCount > count) {
+                setIsAnimating(true);
+                setTimeout(() => setIsAnimating(false), 1000);
+                setCount(newCount);
+              }
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe((status) => {
+          if (status !== 'SUBSCRIBED') {
+            console.warn('Could not subscribe to realtime updates:', status);
+          }
+        });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (err) {
+      console.error("Failed to set up real-time subscription:", err);
+    }
   }, [count]);
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex items-center gap-2 ${className || ''}`}>
       <div className="flex items-center bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">
         <Image size={18} className="text-figuro-accent mr-2" />
         <div className="flex items-baseline">
