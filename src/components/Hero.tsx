@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import GenerationCounter from "./GenerationCounter";
 
 const Hero = () => {
   const navigate = useNavigate();
@@ -33,22 +32,13 @@ const Hero = () => {
           </motion.h1>
           
           <motion.p 
-            className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto mb-6"
+            className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto mb-12"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
             Generate, customize, and 3D print your own figurine designs with Figuro.AI
           </motion.p>
-          
-          <motion.div
-            className="flex justify-center mb-8"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-          >
-            <GenerationCounter />
-          </motion.div>
           
           <motion.div
             className="max-w-xl mx-auto"

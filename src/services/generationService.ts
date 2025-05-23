@@ -30,83 +30,6 @@ const setEdgeFunctionStatus = (isAvailable: boolean): void => {
   }
 };
 
-// Increment the global stats counter
-const incrementImageGenerationCount = async (): Promise<void> => {
-  try {
-    console.log("Incrementing image generation count...");
-    
-    // First try to use the increment edge function
-    try {
-      const response = await fetch(`${window.location.origin}/functions/v1/increment`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY || ''}`
-        },
-        body: JSON.stringify({ 
-          table_name: 'stats',
-          id: 'image_generations',
-        }),
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log("Successfully incremented counter via edge function:", result);
-        return;
-      }
-      
-      console.warn("Failed to increment counter via edge function, status:", response.status);
-    } catch (edgeFunctionError) {
-      console.error("Edge function error:", edgeFunctionError);
-    }
-    
-    // If the edge function fails, try the RPC function directly
-    console.log("Trying to increment counter via RPC function...");
-    const { data, error } = await supabase
-      .rpc('increment_stat', {
-        stat_id: 'image_generations',
-        inc_amount: 1
-      });
-      
-    if (error) {
-      throw new Error(`Failed to increment counter: ${error.message}`);
-    }
-    
-    console.log("Successfully incremented counter via RPC function:", data);
-  } catch (error) {
-    console.error("Failed to increment generation counter:", error);
-    
-    // Last resort: try a direct update if the RPC function fails
-    try {
-      console.log("Attempting direct update as fallback...");
-      
-      // First check if record exists
-      const { data: existingData } = await supabase
-        .from('stats')
-        .select('count')
-        .eq('id', 'image_generations')
-        .maybeSingle();
-      
-      if (existingData) {
-        // Update existing record
-        await supabase
-          .from('stats')
-          .update({ count: existingData.count + 1, updated_at: new Date().toISOString() })
-          .eq('id', 'image_generations');
-      } else {
-        // Create new record
-        await supabase
-          .from('stats')
-          .insert({ id: 'image_generations', count: 1 });
-      }
-      
-      console.log("Direct update completed");
-    } catch (updateError) {
-      console.error("Even direct update failed:", updateError);
-    }
-  }
-};
-
 // Generate image using edge function
 export const generateImage = async (prompt: string, style: string, apiKey: string = ""): Promise<{blob: Blob | null, url: string | null, error?: string, method: "edge" | "direct"}> => {
   try {
@@ -173,8 +96,6 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
             
             // Check if the JSON contains an image URL
             if (jsonData.url) {
-              // Increment the image generation counter
-              await incrementImageGenerationCount();
               return { blob: null, url: jsonData.url, method: "edge" };
             } else {
               throw new Error("No image data returned");
@@ -188,9 +109,6 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
         try {
           const imageBlob = await response.blob();
           const imageUrl = URL.createObjectURL(imageBlob);
-          
-          // Increment the image generation counter
-          await incrementImageGenerationCount();
           
           return { blob: imageBlob, url: imageUrl, method: "edge" };
         } catch (blobError) {
@@ -224,9 +142,6 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
       // Fetch the blob from the URL
       const blobResponse = await fetch(edgeResult.imageUrl);
       const blob = await blobResponse.blob();
-      
-      // Increment the image generation counter
-      await incrementImageGenerationCount();
       
       return {
         blob,
