@@ -1,9 +1,17 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { downloadAndSaveModel } from "@/utils/modelUtils";
+
+// Define the return type for handleGenerate to make it consistent
+type GenerateResult = {
+  success: boolean;
+  needsApiKey: boolean;
+  error?: string;
+};
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -337,7 +345,7 @@ export const useImageGeneration = () => {
   };
 
   // Generate image using a single generation attempt strategy
-  const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string) => {
+  const handleGenerate = async (prompt: string, style: string, apiKey: string = "", preGeneratedImageUrl?: string): Promise<GenerateResult> => {
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey") || apiKey;
     
     setIsGeneratingImage(true);
@@ -369,7 +377,7 @@ export const useImageGeneration = () => {
           // Check if the error is about API key
           if (result.error.includes("API key") || result.error.includes("unauthorized")) {
             setRequiresApiKey(true);
-            return { success: false, needsApiKey: true };
+            return { success: false, needsApiKey: true, error: result.error };
           }
           
           throw new Error(result.error);
@@ -410,7 +418,11 @@ export const useImageGeneration = () => {
         variant: "destructive",
       });
       
-      return { success: false, needsApiKey: requiresApiKey };
+      return { 
+        success: false, 
+        needsApiKey: requiresApiKey,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
     } finally {
       setIsGeneratingImage(false);
     }

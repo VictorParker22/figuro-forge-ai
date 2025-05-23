@@ -133,10 +133,10 @@ const Studio = () => {
           description: "Please enter your Hugging Face API key to continue",
         });
       } else if (!result.success) {
-        // If there was an error but not related to API key
+        // The error property doesn't exist on the result type, so use a generic message
         toast({
           title: "Generation Failed",
-          description: result.error || "Failed to generate image. Please try again.",
+          description: "Failed to generate image. Please try again.",
           variant: "destructive",
         });
       }
