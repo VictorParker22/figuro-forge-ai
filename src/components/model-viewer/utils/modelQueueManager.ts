@@ -6,7 +6,7 @@ class ModelQueueManager {
   private static instance: ModelQueueManager;
   private loadingCount = 0;
   private maxConcurrent = 2; // Maximum number of models loading at once
-  private queue: Array<() => Promise<void>> = [];
+  private queue: Array<() => Promise<unknown>> = [];
   private activeLoaders = new Set<string>();
 
   private constructor() {}
