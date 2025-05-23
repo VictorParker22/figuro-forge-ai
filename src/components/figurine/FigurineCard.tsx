@@ -7,6 +7,7 @@ import { Eye, Download, Box, Upload, GalleryHorizontal } from 'lucide-react';
 import { Figurine } from '@/types/figurine';
 import { Badge } from '@/components/ui/badge';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { useIntersectionObserver } from '@/hooks/useIntersectionObserver';
 
 interface FigurineCardProps {
   figurine: Figurine;
@@ -24,12 +25,37 @@ const FigurineCard = ({
   onUploadModel 
 }: FigurineCardProps) => {
   const [imageError, setImageError] = React.useState(false);
+  const { targetRef, isIntersecting, wasEverVisible } = useIntersectionObserver({
+    rootMargin: '200px',
+    threshold: 0.1,
+    once: true
+  });
+
+  // Clean image URL to prevent cache-busting issues
+  const cleanImageUrl = React.useMemo(() => {
+    try {
+      if (!figurine.saved_image_url && !figurine.image_url) return '';
+      
+      const url = new URL(figurine.saved_image_url || figurine.image_url);
+      // Remove all cache-busting parameters
+      ['t', 'cb', 'cache'].forEach(param => {
+        if (url.searchParams.has(param)) {
+          url.searchParams.delete(param);
+        }
+      });
+      return url.toString();
+    } catch (e) {
+      // If URL parsing fails, return the original
+      return figurine.saved_image_url || figurine.image_url;
+    }
+  }, [figurine.saved_image_url, figurine.image_url]);
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
+      ref={targetRef as React.RefObject<HTMLDivElement>}
     >
       <Card className="glass-panel overflow-hidden h-full">
         <CardHeader className="p-3 border-b border-white/10">
@@ -48,13 +74,13 @@ const FigurineCard = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="aspect-square w-full">
-            <AspectRatio ratio={1}>
+          <div className="w-full">
+            <AspectRatio ratio={1} className="bg-black/20">
               {!imageError ? (
                 <img 
-                  src={figurine.saved_image_url || figurine.image_url} 
+                  src={cleanImageUrl}
                   alt={figurine.title}
-                  className="w-full h-full object-contain p-2"
+                  className="w-full h-full object-cover"
                   loading="lazy" 
                   onError={() => setImageError(true)}
                 />

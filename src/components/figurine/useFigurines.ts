@@ -30,18 +30,46 @@ export const useFigurines = () => {
       if (error) throw error;
       
       // Make sure all required properties exist in the data by casting to our Figurine type
-      const processedData = (data || []).map(figurine => ({
-        id: figurine.id,
-        title: figurine.title || "Untitled Figurine",
-        prompt: figurine.prompt || "",
-        style: figurine.style || "",
-        image_url: figurine.image_url || "",
-        saved_image_url: figurine.saved_image_url || null,
-        model_url: figurine.model_url || null,
-        created_at: figurine.created_at || new Date().toISOString(),
-        user_id: figurine.user_id,
-        is_public: figurine.is_public || false
-      }));
+      const processedData = (data || []).map(figurine => {
+        // Clean image URLs from any cache busting parameters
+        let imageUrl = figurine.image_url || "";
+        let savedImageUrl = figurine.saved_image_url || null;
+        let modelUrl = figurine.model_url || null;
+        
+        // Helper function to clean URLs
+        const cleanUrl = (url: string) => {
+          try {
+            if (!url) return url;
+            const parsedUrl = new URL(url);
+            ['t', 'cb', 'cache'].forEach(param => {
+              if (parsedUrl.searchParams.has(param)) {
+                parsedUrl.searchParams.delete(param);
+              }
+            });
+            return parsedUrl.toString();
+          } catch (e) {
+            return url;
+          }
+        };
+        
+        // Clean all URLs
+        if (imageUrl) imageUrl = cleanUrl(imageUrl);
+        if (savedImageUrl) savedImageUrl = cleanUrl(savedImageUrl);
+        if (modelUrl) modelUrl = cleanUrl(modelUrl);
+        
+        return {
+          id: figurine.id,
+          title: figurine.title || "Untitled Figurine",
+          prompt: figurine.prompt || "",
+          style: figurine.style || "",
+          image_url: imageUrl,
+          saved_image_url: savedImageUrl,
+          model_url: modelUrl,
+          created_at: figurine.created_at || new Date().toISOString(),
+          user_id: figurine.user_id,
+          is_public: figurine.is_public || false
+        };
+      });
       
       setFigurines(processedData);
       setError(null);

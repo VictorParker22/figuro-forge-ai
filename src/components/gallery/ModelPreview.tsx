@@ -23,7 +23,7 @@ const ModelContent = ({
   isVisible: boolean 
 }) => {
   // Create a stable ID based on the URL to prevent reloads
-  const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}`);
+  const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}-${Math.random().toString(36).substring(2, 9)}`);
   
   // Clean URL from query parameters to prevent cache busting which causes reloads
   const cleanUrl = useMemo(() => {
@@ -131,7 +131,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             
             <OrbitControls 
               autoRotate={isIntersecting} // Only auto-rotate when visible
-              autoRotateSpeed={2} // Reduced from 4 for better performance
+              autoRotateSpeed={1.5} // Reduced from 4 for better performance
               enablePan={false}
               enableZoom={false}
               enableRotate={false} // Disabled rotation for gallery view

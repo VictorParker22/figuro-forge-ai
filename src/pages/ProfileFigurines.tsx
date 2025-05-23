@@ -25,7 +25,25 @@ const ProfileFigurines = () => {
       <div className="min-h-screen bg-figuro-dark">
         <Header />
         <div className="container mx-auto pt-32 pb-24 flex justify-center items-center">
-          <Loader2 className="h-8 w-8 animate-spin text-figuro-accent" />
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-figuro-accent" />
+            <p className="text-white/70">Loading your profile...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // If no user after loading, redirect will happen in useEffect
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-figuro-dark">
+        <Header />
+        <div className="container mx-auto pt-32 pb-24 flex justify-center items-center">
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-white/70">Please sign in to view your figurines</p>
+          </div>
         </div>
         <Footer />
       </div>

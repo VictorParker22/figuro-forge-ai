@@ -30,8 +30,10 @@ const FigurineGallery = () => {
     try {
       setIsDownloading(true);
       
-      // Remove any cache busting parameters
+      // Clean the URL by removing any cache busting parameters
       const cleanUrl = imageUrl.split('?')[0];
+      
+      console.log("Starting download for:", cleanUrl);
       
       // Fetch the image data as a blob
       const response = await fetch(cleanUrl);
@@ -40,6 +42,7 @@ const FigurineGallery = () => {
       }
       
       const blob = await response.blob();
+      console.log("Blob received:", blob.type, blob.size);
       
       // Create an object URL for the blob
       const blobUrl = URL.createObjectURL(blob);
@@ -50,8 +53,6 @@ const FigurineGallery = () => {
       a.download = `figurine-${figurine.title.replace(/\s+/g, '-')}-${figurine.id.substring(0, 8)}.png`;
       document.body.appendChild(a);
       a.click();
-      
-      // Clean up
       document.body.removeChild(a);
       
       toast({
@@ -85,7 +86,25 @@ const FigurineGallery = () => {
       return;
     }
     
-    setSelectedFigurine(figurine);
+    // Clean up model URL to prevent cache-busting issues
+    let modelUrl = figurine.model_url;
+    try {
+      const url = new URL(figurine.model_url);
+      // Remove cache-busting parameters
+      ['t', 'cb', 'cache'].forEach(param => {
+        if (url.searchParams.has(param)) {
+          url.searchParams.delete(param);
+        }
+      });
+      modelUrl = url.toString();
+    } catch (e) {
+      console.error("Error parsing model URL", e);
+    }
+    
+    setSelectedFigurine({
+      ...figurine,
+      model_url: modelUrl
+    });
     setModelViewerOpen(true);
   };
 

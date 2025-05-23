@@ -29,7 +29,12 @@ const FigurineList = ({
   }
 
   if (error) {
-    return <div className="text-center text-destructive py-8">{error}</div>;
+    return (
+      <div className="text-center py-10 px-4 bg-red-900/20 rounded-lg border border-red-900/30">
+        <p className="text-destructive font-medium mb-2">Error</p>
+        <p className="text-white/70">{error}</p>
+      </div>
+    );
   }
 
   if (figurines.length === 0) {
@@ -37,9 +42,9 @@ const FigurineList = ({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
       {figurines.map((figurine) => (
-        <div key={figurine.id} className="h-full">
+        <div key={figurine.id}>
           <FigurineCard
             figurine={figurine}
             onDownload={onDownload}

@@ -41,10 +41,12 @@ export const useModelViewer = () => {
     activeViewersRef.current = Math.max(0, activeViewersRef.current - 1);
     webGLContextTracker.releaseContext();
     
-    // Allow a more generous timeout for cleanup before allowing another open
+    // Force garbage collection and cleanup
     setTimeout(() => {
       console.log("Model viewer resources released");
-    }, 800); // Increased from 500 to 800ms
+      // Force a small UI refresh to clear any stale resources
+      setViewingModel(null);
+    }, 800);
   };
 
   // Clean URLs from cache-busting parameters
@@ -60,12 +62,23 @@ export const useModelViewer = () => {
       return parsedUrl.toString();
     } catch (e) {
       // If URL parsing fails, return the original
+      console.warn("Failed to parse model URL:", e);
       return url;
     }
   };
 
   // Handle opening full model viewer
   const handleViewModel = (modelUrl: string) => {
+    // First make sure the URL is valid
+    if (!modelUrl || typeof modelUrl !== 'string') {
+      toast({
+        title: "Invalid model",
+        description: "The model URL is invalid or missing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Check if we're already at the maximum number of active viewers
     if (activeViewersRef.current >= MAX_ACTIVE_VIEWERS) {
       toast({
@@ -87,6 +100,7 @@ export const useModelViewer = () => {
     
     // Clean the URL to prevent reloading and resource issues
     const cleanedUrl = cleanModelUrl(modelUrl);
+    console.log("Opening model viewer with URL:", cleanedUrl);
     
     // First close any existing viewer to clean up resources
     if (modelViewerOpen) {
