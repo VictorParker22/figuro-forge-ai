@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { Figurine } from "@/types/figurine";
@@ -64,6 +65,19 @@ export const updateFigurineWithModelUrl = async (figurineId: string, modelUrl: s
     }).eq('id', figurineId);
   } catch (error) {
     console.error('Error updating figurine with model URL:', error);
+    throw error;
+  }
+};
+
+// Update the public status of a figurine
+export const updateFigurinePublicStatus = async (figurineId: string, isPublic: boolean): Promise<void> => {
+  try {
+    await supabase.from('figurines').update({
+      is_public: isPublic
+    }).eq('id', figurineId);
+  } catch (error) {
+    console.error('Error updating figurine public status:', error);
+    throw error;
   }
 };
 

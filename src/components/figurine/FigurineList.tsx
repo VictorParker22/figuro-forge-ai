@@ -11,6 +11,8 @@ interface FigurineListProps {
   error: string | null;
   onDownload: (figurine: Figurine) => void;
   onViewModel: (figurine: Figurine) => void;
+  onTogglePublish?: (figurine: Figurine) => void;
+  onUploadModel?: (figurine: Figurine) => void;
 }
 
 const FigurineList = ({ 
@@ -18,7 +20,9 @@ const FigurineList = ({
   loading, 
   error, 
   onDownload, 
-  onViewModel 
+  onViewModel,
+  onTogglePublish,
+  onUploadModel
 }: FigurineListProps) => {
   if (loading) {
     return <LoadingState />;
@@ -40,6 +44,8 @@ const FigurineList = ({
           figurine={figurine}
           onDownload={onDownload}
           onViewModel={onViewModel}
+          onTogglePublish={onTogglePublish}
+          onUploadModel={onUploadModel}
         />
       ))}
     </div>
