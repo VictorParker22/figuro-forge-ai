@@ -49,9 +49,10 @@ serve(async (req) => {
 
     // Set up the plan pricing (customize based on your actual plans)
     const planPrices = {
-      "starter": "price_1OYFJc2eZvKYlo2CHQudwJHN", // Replace with your actual price IDs
-      "pro": "price_1OYFJc2eZvKYlo2CfMVXYHDN",
-      "unlimited": "price_1OYFJc2eZvKYlo2CK1FCsrHN",
+      // Note: These are placeholder price IDs and should be updated to match your actual Stripe price IDs
+      "starter": "price_1OYFJc2eZvKYlo2CHQudwJHN", // $12.99 monthly
+      "pro": "price_1OYFJc2eZvKYlo2CfMVXYHDN",     // $29.99 monthly
+      "unlimited": "price_1OYFJc2eZvKYlo2CK1FCsrHN", // $59.99 monthly
     };
 
     // Check if the plan is valid
@@ -69,7 +70,7 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: successUrl || `${req.headers.get("origin")}/complete-profile?success=true`,
+      success_url: successUrl || `${req.headers.get("origin")}/pricing?success=true`,
       cancel_url: cancelUrl || `${req.headers.get("origin")}/pricing?canceled=true`,
       metadata: {
         user_id: user.id,

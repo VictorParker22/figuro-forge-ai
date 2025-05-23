@@ -100,11 +100,11 @@ serve(async (req) => {
       // Determine the new plan based on the subscription item's price
       const priceId = subscription.items.data[0].price.id;
       
-      // Map price IDs to plan names (you'll need to customize this based on your plans)
+      // Map price IDs to plan names (you'll need to update these with your actual price IDs)
       const planMapping = {
-        "price_1OYFJc2eZvKYlo2CHQudwJHN": "starter", // Replace with your actual price IDs
-        "price_1OYFJc2eZvKYlo2CfMVXYHDN": "pro",
-        "price_1OYFJc2eZvKYlo2CK1FCsrHN": "unlimited",
+        "price_1OYFJc2eZvKYlo2CHQudwJHN": "starter", // $12.99 monthly
+        "price_1OYFJc2eZvKYlo2CfMVXYHDN": "pro",     // $29.99 monthly
+        "price_1OYFJc2eZvKYlo2CK1FCsrHN": "unlimited", // $59.99 monthly
       };
       
       const plan = planMapping[priceId] || "free";

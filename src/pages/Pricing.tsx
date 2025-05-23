@@ -29,7 +29,7 @@ const pricingPlans = [
   {
     id: "starter",
     name: "Starter",
-    price: "$9.99",
+    price: "$12.99",
     features: [
       { name: "20 Image Generations / Month", included: true },
       { name: "5 Model Conversions / Month", included: true },
@@ -45,7 +45,7 @@ const pricingPlans = [
   {
     id: "pro",
     name: "Professional",
-    price: "$24.99",
+    price: "$29.99",
     features: [
       { name: "100 Image Generations / Month", included: true },
       { name: "20 Model Conversions / Month", included: true },
@@ -60,7 +60,7 @@ const pricingPlans = [
   {
     id: "unlimited",
     name: "Unlimited",
-    price: "$49.99",
+    price: "$59.99",
     features: [
       { name: "Unlimited Image Generations", included: true },
       { name: "Unlimited Model Conversions", included: true },
