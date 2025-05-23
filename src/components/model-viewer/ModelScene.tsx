@@ -22,58 +22,48 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
   const [stableBlob, setStableBlob] = useState<Blob | null>(modelBlob || null);
   const [loadKey, setLoadKey] = useState<string>(`load-${Date.now()}`);
   
-  // Stabilize the source to prevent rapid changes
+  // Force a remount of the entire scene when the source changes significantly
   useEffect(() => {
-    // Only update if there's been a significant change in modelUrl
-    // and it's different from what we're currently tracking
+    console.log("[ModelScene] URL source changed to", modelUrl);
+    
+    // If this is a completely new URL
     if (modelUrl !== currentSourceRef.current) {
-      console.log("ModelScene: URL source changed to", modelUrl);
-      
-      // Clear any previous timeouts
-      const current = currentSourceRef.current;
       currentSourceRef.current = modelUrl;
       
-      // If this is a completely new URL (not just undefined → undefined)
-      if (modelUrl || (current !== null && modelUrl !== current)) {
-        // Generate new load key to force proper re-mounting
-        setLoadKey(`load-${Date.now()}`);
-        
-        // Small delay to ensure stable updates and prevent thrashing
-        const timer = setTimeout(() => {
-          setStableSource(modelUrl);
-          // Clear blob when URL changes
-          if (modelUrl) setStableBlob(null);
-        }, 100);
-        
-        return () => clearTimeout(timer);
-      }
+      // Generate new load key to force proper re-mounting
+      const newLoadKey = `load-${Date.now()}`;
+      setLoadKey(newLoadKey);
+      console.log("[ModelScene] Forcing remount with new key:", newLoadKey);
+      
+      // Update the stable source
+      setStableSource(modelUrl);
+      
+      // Clear blob when URL changes
+      if (modelUrl) setStableBlob(null);
     }
   }, [modelUrl]);
   
   // Separate effect for blob changes to prevent dependencies conflicts
   useEffect(() => {
-    // Only update if the blob itself has changed and is not null
     if (modelBlob && modelBlob !== currentSourceRef.current) {
-      console.log("ModelScene: Blob source changed");
+      console.log("[ModelScene] Blob source changed");
       
       // Generate new load key to force proper re-mounting
-      setLoadKey(`load-${Date.now()}`);
+      const newLoadKey = `load-${Date.now()}`;
+      setLoadKey(newLoadKey);
+      console.log("[ModelScene] Forcing remount with new key:", newLoadKey);
+      
       currentSourceRef.current = modelBlob;
+      setStableBlob(modelBlob);
       
-      // Small delay to ensure stable updates
-      const timer = setTimeout(() => {
-        setStableBlob(modelBlob);
-        // Clear URL when blob changes
-        if (modelBlob) setStableSource(null);
-      }, 100);
-      
-      return () => clearTimeout(timer);
+      // Clear URL when blob changes
+      if (modelBlob) setStableSource(null);
     }
   }, [modelBlob]);
 
   // Handler for errors in the 3D model
   const handleModelError = (error: any) => {
-    console.error("ModelScene: Error in 3D model:", error);
+    console.error("[ModelScene] Error in 3D model:", error);
     onModelError(error);
   };
 

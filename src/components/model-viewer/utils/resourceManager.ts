@@ -1,120 +1,94 @@
 
 import * as THREE from "three";
-import { disposeModel } from "./modelUtils";
 
 /**
- * Clean up resources to prevent memory leaks
- * @param model The model to clean up
- * @param objectUrl The object URL to revoke
- * @param abortController The abort controller to abort
+ * Recursively dispose of Three.js resources to prevent memory leaks
+ * @param object The object to dispose
+ * @returns void
  */
-export const cleanupResources = (
-  model: THREE.Group | null,
-  objectUrl: string | null,
-  abortController: AbortController | null
-): void => {
-  // Abort any in-progress loads
-  if (abortController) {
-    try {
-      abortController.abort();
-      console.log("Aborted in-progress model load");
-    } catch (error) {
-      console.error("Error aborting model load:", error);
+export const disposeObject = (object: THREE.Object3D): void => {
+  if (!object) return;
+  
+  // Traverse the children
+  object.traverse((child: THREE.Object3D) => {
+    // Handle meshes
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      
+      // Dispose geometry
+      if (mesh.geometry) {
+        mesh.geometry.dispose();
+      }
+      
+      // Dispose material(s)
+      if (mesh.material) {
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach(material => {
+            disposeMaterial(material);
+          });
+        } else {
+          disposeMaterial(mesh.material);
+        }
+      }
     }
+  });
+  
+  // Remove from parent if it exists
+  if (object.parent) {
+    object.parent.remove(object);
   }
   
-  // Dispose the model
-  if (model) {
-    try {
-      console.log("Disposing model resources");
-      disposeModel(model);
-    } catch (error) {
-      console.error("Error disposing model:", error);
-    }
-  }
-  
-  // Revoke object URL if we created one
-  if (objectUrl && objectUrl.startsWith('blob:')) {
-    try {
-      URL.revokeObjectURL(objectUrl);
-      console.log("Revoked object URL:", objectUrl);
-    } catch (error) {
-      console.error("Error revoking object URL:", error);
-    }
-  }
-  
-  // Force garbage collection hint (not guaranteed to work)
-  if (window.gc) {
-    try {
-      window.gc();
-    } catch (e) {
-      console.log("Manual GC not available");
-    }
-  }
+  console.log("[resourceManager] Disposed of object and its resources");
 };
 
 /**
- * Track WebGL context usage across the application
+ * Dispose of a Three.js material and its textures
+ * @param material The material to dispose
  */
-class WebGLContextTracker {
-  private static instance: WebGLContextTracker;
-  private contextCount = 0;
-  private readonly MAX_CONTEXTS = 8; // Most browsers limit to 8-16 concurrent contexts
-  private disposalTimeouts: number[] = [];
+export const disposeMaterial = (material: THREE.Material): void => {
+  if (!material) return;
   
-  private constructor() {}
-  
-  public static getInstance(): WebGLContextTracker {
-    if (!WebGLContextTracker.instance) {
-      WebGLContextTracker.instance = new WebGLContextTracker();
+  // Dispose textures
+  for (const key in material) {
+    const value = (material as any)[key];
+    if (value && value.isTexture) {
+      value.dispose();
     }
-    return WebGLContextTracker.instance;
   }
   
-  public registerContext(): number {
-    // Clear any pending disposal timeouts
-    this.clearDisposalTimeouts();
-    
-    this.contextCount++;
-    console.log(`WebGL context created. Active contexts: ${this.contextCount}/${this.MAX_CONTEXTS}`);
-    return this.contextCount;
-  }
-  
-  public releaseContext(): number {
-    // Use a timeout to help with disposal
-    const timeoutId = window.setTimeout(() => {
-      if (this.contextCount > 0) {
-        this.contextCount--;
-      }
-      console.log(`WebGL context released. Active contexts: ${this.contextCount}/${this.MAX_CONTEXTS}`);
-      
-      // Remove this timeout from the array
-      this.disposalTimeouts = this.disposalTimeouts.filter(id => id !== timeoutId);
-    }, 500) as unknown as number;
-    
-    this.disposalTimeouts.push(timeoutId);
-    
-    return this.contextCount;
-  }
-  
-  private clearDisposalTimeouts(): void {
-    this.disposalTimeouts.forEach(id => window.clearTimeout(id));
-    this.disposalTimeouts = [];
-  }
-  
-  public isNearingLimit(): boolean {
-    return this.contextCount > (this.MAX_CONTEXTS * 0.7); // 70% of max
-  }
-  
-  public getActiveContextCount(): number {
-    return this.contextCount;
-  }
-  
-  public reset(): void {
-    this.clearDisposalTimeouts();
-    this.contextCount = 0;
-    console.log("WebGL context tracker reset");
-  }
-}
+  // Dispose material
+  material.dispose();
+};
 
-export const webGLContextTracker = WebGLContextTracker.getInstance();
+/**
+ * Clean up all resources associated with a model
+ * @param model The model to clean up
+ * @param objectUrl Optional object URL to revoke
+ * @param controller Optional abort controller to abort
+ */
+export const cleanupResources = (
+  model: THREE.Group | null,
+  objectUrl?: string | null,
+  controller?: AbortController | null
+): void => {
+  // Abort any in-progress operations
+  if (controller) {
+    controller.abort();
+    console.log("[resourceManager] Aborted in-progress operations");
+  }
+  
+  // Revoke object URL if it exists
+  if (objectUrl && objectUrl.startsWith('blob:')) {
+    try {
+      URL.revokeObjectURL(objectUrl);
+      console.log("[resourceManager] Revoked object URL:", objectUrl);
+    } catch (error) {
+      console.error("[resourceManager] Error revoking object URL:", error);
+    }
+  }
+  
+  // Dispose object if it exists
+  if (model) {
+    disposeObject(model);
+  }
+};
