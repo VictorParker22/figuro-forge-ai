@@ -47,25 +47,66 @@ serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
-    // Set up the plan pricing (customize based on your actual plans)
-    const planPrices = {
-      // Note: These are placeholder price IDs and should be updated to match your actual Stripe price IDs
-      "starter": "price_1OYFJc2eZvKYlo2CHQudwJHN", // $12.99 monthly
-      "pro": "price_1OYFJc2eZvKYlo2CfMVXYHDN",     // $29.99 monthly
-      "unlimited": "price_1OYFJc2eZvKYlo2CK1FCsrHN", // $59.99 monthly
-    };
-
-    // Check if the plan is valid
-    if (!planPrices[plan]) {
-      throw new Error(`Invalid plan: ${plan}`);
+    // Create product and price if they don't exist
+    // This is a safer approach that will create products if they're missing
+    // and return existing ones if they already exist
+    async function getOrCreatePriceId(planName) {
+      // First, check if we already have the product
+      const products = await stripe.products.list({ active: true });
+      const existingProduct = products.data.find(p => p.name.toLowerCase() === planName.toLowerCase());
+      
+      if (existingProduct && existingProduct.default_price) {
+        // Return existing price ID
+        return existingProduct.default_price.toString();
+      }
+      
+      // Set up price details based on the plan
+      let productDetails = {
+        name: planName,
+        description: `${planName} Plan`,
+      };
+      
+      let priceDetails = {
+        currency: 'usd',
+        recurring: { interval: 'month' },
+      };
+      
+      // Set price based on plan
+      switch (planName.toLowerCase()) {
+        case 'starter':
+          priceDetails.unit_amount = 1299; // $12.99
+          break;
+        case 'pro':
+          priceDetails.unit_amount = 2999; // $29.99
+          break;
+        case 'unlimited':
+          priceDetails.unit_amount = 5999; // $59.99
+          break;
+        default:
+          throw new Error(`Unknown plan: ${planName}`);
+      }
+      
+      // Create the product
+      const product = await stripe.products.create(productDetails);
+      
+      // Create the price
+      const price = await stripe.prices.create({
+        ...priceDetails,
+        product: product.id,
+      });
+      
+      return price.id;
     }
+
+    // Get or create price ID for the requested plan
+    const priceId = await getOrCreatePriceId(plan);
 
     // Create a checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
         {
-          price: planPrices[plan],
+          price: priceId,
           quantity: 1,
         },
       ],

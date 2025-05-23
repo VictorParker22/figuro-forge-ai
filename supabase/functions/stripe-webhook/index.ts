@@ -97,17 +97,22 @@ serve(async (req) => {
       const subscription = event.data.object;
       const customerId = subscription.customer;
       
-      // Determine the new plan based on the subscription item's price
+      // Get the price object to determine the plan
       const priceId = subscription.items.data[0].price.id;
+      const price = await stripe.prices.retrieve(priceId);
+      const product = await stripe.products.retrieve(price.product.toString());
       
-      // Map price IDs to plan names (you'll need to update these with your actual price IDs)
-      const planMapping = {
-        "price_1OYFJc2eZvKYlo2CHQudwJHN": "starter", // $12.99 monthly
-        "price_1OYFJc2eZvKYlo2CfMVXYHDN": "pro",     // $29.99 monthly
-        "price_1OYFJc2eZvKYlo2CK1FCsrHN": "unlimited", // $59.99 monthly
-      };
+      // Determine plan based on the product name
+      const productName = product.name.toLowerCase();
+      let plan = "free";
       
-      const plan = planMapping[priceId] || "free";
+      if (productName.includes("starter")) {
+        plan = "starter";
+      } else if (productName.includes("pro")) {
+        plan = "pro";
+      } else if (productName.includes("unlimited")) {
+        plan = "unlimited";
+      }
       
       // Find user by customer ID
       const { data: profiles, error: profileError } = await supabaseAdmin
