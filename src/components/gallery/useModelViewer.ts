@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { modelQueueManager } from "../model-viewer/utils/modelQueueManager";
 import { webGLContextTracker } from "../model-viewer/utils/resourceManager";
 
-// Maximum number of model viewers that can be open at once
+// Maximum number of model viewers that can be open at once - reduced for stability
 const MAX_ACTIVE_VIEWERS = 1;
 
 export const useModelViewer = () => {
@@ -17,15 +17,19 @@ export const useModelViewer = () => {
 
   // Configure the queue manager when component mounts
   useEffect(() => {
-    // Set concurrent loading limit to 1 to reduce errors
+    // Set concurrent loading limit to 1 to prevent WebGL context exhaustion
     modelQueueManager.setMaxConcurrent(1);
     
     return () => {
       // Reset active viewers count when component unmounts
-      activeViewersRef.current = 0;
-      
-      // Reset queue manager to clean up resources
-      modelQueueManager.reset();
+      if (activeViewersRef.current > 0) {
+        console.log("Cleaning up model viewer resources on unmount");
+        activeViewersRef.current = 0;
+        
+        // Reset queue manager to clean up resources
+        modelQueueManager.reset();
+        webGLContextTracker.reset();
+      }
     };
   }, []);
 
@@ -37,10 +41,27 @@ export const useModelViewer = () => {
     activeViewersRef.current = Math.max(0, activeViewersRef.current - 1);
     webGLContextTracker.releaseContext();
     
-    // Allow a short timeout for cleanup before allowing another open
+    // Allow a more generous timeout for cleanup before allowing another open
     setTimeout(() => {
       console.log("Model viewer resources released");
-    }, 500); // Increased from 300 to 500ms
+    }, 800); // Increased from 500 to 800ms
+  };
+
+  // Clean URLs from cache-busting parameters
+  const cleanModelUrl = (url: string): string => {
+    try {
+      const parsedUrl = new URL(url);
+      // Remove cache-busting parameters
+      ['t', 'cb', 'cache'].forEach(param => {
+        if (parsedUrl.searchParams.has(param)) {
+          parsedUrl.searchParams.delete(param);
+        }
+      });
+      return parsedUrl.toString();
+    } catch (e) {
+      // If URL parsing fails, return the original
+      return url;
+    }
   };
 
   // Handle opening full model viewer
@@ -48,7 +69,7 @@ export const useModelViewer = () => {
     // Check if we're already at the maximum number of active viewers
     if (activeViewersRef.current >= MAX_ACTIVE_VIEWERS) {
       toast({
-        title: "Too many viewers open",
+        title: "Viewer already open",
         description: "Please close the current model viewer before opening another one.",
         variant: "default",
       });
@@ -64,19 +85,22 @@ export const useModelViewer = () => {
       });
     }
     
+    // Clean the URL to prevent reloading and resource issues
+    const cleanedUrl = cleanModelUrl(modelUrl);
+    
     // First close any existing viewer to clean up resources
     if (modelViewerOpen) {
       handleCloseModelViewer();
       
       // Increased timeout to ensure cleanup before opening new model
       setTimeout(() => {
-        setViewingModel(modelUrl);
+        setViewingModel(cleanedUrl);
         setModelViewerOpen(true);
         activeViewersRef.current += 1;
         webGLContextTracker.registerContext();
-      }, 500);
+      }, 800);
     } else {
-      setViewingModel(modelUrl);
+      setViewingModel(cleanedUrl);
       setModelViewerOpen(true);
       activeViewersRef.current += 1;
       webGLContextTracker.registerContext();

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, Download, Box, Upload, GalleryHorizontal } from 'lucide-react';
 import { Figurine } from '@/types/figurine';
 import { Badge } from '@/components/ui/badge';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 interface FigurineCardProps {
   figurine: Figurine;
@@ -22,13 +23,15 @@ const FigurineCard = ({
   onTogglePublish, 
   onUploadModel 
 }: FigurineCardProps) => {
+  const [imageError, setImageError] = React.useState(false);
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <Card className="glass-panel overflow-hidden">
+      <Card className="glass-panel overflow-hidden h-full">
         <CardHeader className="p-3 border-b border-white/10">
           <CardTitle className="text-sm font-medium truncate flex items-center justify-between">
             <span className="flex items-center">
@@ -45,13 +48,24 @@ const FigurineCard = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="aspect-square w-full p-2">
-            <img 
-              src={figurine.saved_image_url || figurine.image_url} 
-              alt={figurine.title}
-              className="w-full h-full object-contain rounded-md"
-              loading="lazy" 
-            />
+          <div className="aspect-square w-full">
+            <AspectRatio ratio={1}>
+              {!imageError ? (
+                <img 
+                  src={figurine.saved_image_url || figurine.image_url} 
+                  alt={figurine.title}
+                  className="w-full h-full object-contain p-2"
+                  loading="lazy" 
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-800 p-2">
+                  <p className="text-white/60 text-xs text-center">
+                    Unable to load image
+                  </p>
+                </div>
+              )}
+            </AspectRatio>
           </div>
         </CardContent>
         <CardFooter className="p-2 gap-1 flex flex-wrap justify-between">

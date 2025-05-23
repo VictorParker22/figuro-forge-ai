@@ -5,11 +5,12 @@
 class ModelQueueManager {
   private static instance: ModelQueueManager;
   private loadingCount = 0;
-  private maxConcurrent = 1; // Reduced from 2 to 1 to prevent loading too many models at once
+  private maxConcurrent = 1; // Fixed to 1 to prevent overloading WebGL contexts
   private queue: Array<() => Promise<unknown>> = [];
   private activeLoaders = new Set<string>();
   private abortControllers = new Map<string, AbortController>();
   private processingQueue = false;
+  private lastProcessTime = 0; // Track when we last processed an item
 
   private constructor() {}
 
@@ -24,7 +25,8 @@ class ModelQueueManager {
    * Set the maximum number of concurrent model loads
    */
   public setMaxConcurrent(max: number): void {
-    this.maxConcurrent = max;
+    this.maxConcurrent = Math.max(1, Math.min(max, 2)); // Clamp between 1 and 2
+    console.log(`[Queue] Max concurrent loads set to ${this.maxConcurrent}`);
   }
 
   /**
@@ -50,8 +52,8 @@ class ModelQueueManager {
           this.loadingCount--;
         }
         
-        // Process queue in case there are pending items
-        setTimeout(() => this.processQueue(), 100);
+        // Process queue in case there are pending items with a delay
+        setTimeout(() => this.processQueue(), 200);
       } catch (error) {
         console.error(`Error aborting model load for ${modelId}:`, error);
       }
@@ -105,8 +107,9 @@ class ModelQueueManager {
           this.activeLoaders.delete(modelId);
           this.abortControllers.delete(modelId);
           
-          // Add a small delay before processing the next item to avoid thrashing
-          setTimeout(() => this.processQueue(), 150);
+          // Add a significant delay before processing the next item
+          this.lastProcessTime = Date.now();
+          setTimeout(() => this.processQueue(), 500);
         }
       };
 
@@ -124,6 +127,15 @@ class ModelQueueManager {
    * Process the next item in the queue
    */
   private processQueue(): void {
+    // Prevent queue thrashing by enforcing minimum time between processes
+    const now = Date.now();
+    const timeSinceLastProcess = now - this.lastProcessTime;
+    if (timeSinceLastProcess < 300) {
+      console.log(`[Queue] Throttling queue processing - only ${timeSinceLastProcess}ms since last process`);
+      setTimeout(() => this.processQueue(), 300 - timeSinceLastProcess);
+      return;
+    }
+    
     if (this.processingQueue) return;
     this.processingQueue = true;
     
@@ -132,9 +144,10 @@ class ModelQueueManager {
         console.log(`[Queue] Processing next in queue, remaining: ${this.queue.length}`);
         const nextLoad = this.queue.shift();
         if (nextLoad) {
+          this.lastProcessTime = now;
           setTimeout(() => {
             nextLoad();
-          }, 200); // Increased delay to prevent race conditions
+          }, 300); // Increased delay to prevent race conditions
         }
       }
     } finally {
