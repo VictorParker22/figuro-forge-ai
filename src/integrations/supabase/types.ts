@@ -84,26 +84,35 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          commercial_license: boolean | null
           created_at: string | null
           display_name: string | null
+          full_name: string | null
           generation_count: number | null
           id: string
+          plan: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
+          commercial_license?: boolean | null
           created_at?: string | null
           display_name?: string | null
+          full_name?: string | null
           generation_count?: number | null
           id: string
+          plan?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
+          commercial_license?: boolean | null
           created_at?: string | null
           display_name?: string | null
+          full_name?: string | null
           generation_count?: number | null
           id?: string
+          plan?: string | null
           updated_at?: string | null
         }
         Relationships: []

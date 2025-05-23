@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import FiguroMascot from "./FiguroMascot";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Menu, X, User, Settings, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, User, Settings, LogOut, ChevronDown, Image } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,6 +117,10 @@ const Header = () => {
                 <DropdownMenuItem onClick={() => navigate("/profile/figurines")}>
                   <FiguroMascot size={16} className="mr-2" />
                   <span>My Figurines</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/profile/pictures")}>
+                  <Image className="mr-2 h-4 w-4" />
+                  <span>Profile Pictures</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/settings")}>
                   <Settings className="mr-2 h-4 w-4" />
