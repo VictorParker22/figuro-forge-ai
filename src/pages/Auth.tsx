@@ -41,7 +41,7 @@ const Auth = () => {
               <Alert className="bg-figuro-accent/10 border-figuro-accent/20">
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  You'll need to verify your email address before signing in.
+                  After signing up, please check your email inbox (and spam folder) for the verification link.
                 </AlertDescription>
               </Alert>
             </div>

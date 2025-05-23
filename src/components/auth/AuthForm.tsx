@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "./AuthProvider";
 import { cleanupAuthState } from "@/utils/authUtils";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { isEmailVerificationError } from "@/utils/authUtils";
 
 export function AuthForm() {
   const { signIn, signUp, signInWithGoogle, resendVerificationEmail } = useAuth();
@@ -34,7 +35,7 @@ export function AuthForm() {
     if (error) {
       setErrorMessage(error);
       // If the error is about email verification, show resend option
-      if (error.includes("verify your email")) {
+      if (isEmailVerificationError(error)) {
         setShowResendOption(true);
       }
     } else {
@@ -53,10 +54,14 @@ export function AuthForm() {
     // Clear any previous auth state
     cleanupAuthState();
     
-    const { error } = await signUp(email, password);
+    const { error, data } = await signUp(email, password);
     
     if (error) {
       setErrorMessage(error);
+    } else if (!data?.session) {
+      // User created but needs email verification
+      setErrorMessage("Please check your email (including spam folder) and click the verification link to complete your registration.");
+      setShowResendOption(true);
     }
     
     setIsLoading(false);
@@ -72,7 +77,9 @@ export function AuthForm() {
     const { error } = await resendVerificationEmail(email);
     setResendLoading(false);
     
-    if (!error) {
+    if (error) {
+      setErrorMessage(error);
+    } else {
       setShowResendOption(false);
     }
   };
@@ -108,7 +115,9 @@ export function AuthForm() {
                   size="sm"
                   onClick={handleResendVerification}
                   disabled={resendLoading}
+                  className="flex items-center gap-2"
                 >
+                  <Mail className="h-4 w-4" />
                   {resendLoading ? "Sending..." : "Resend verification email"}
                 </Button>
               </div>
@@ -177,6 +186,25 @@ export function AuthForm() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{errorMessage}</AlertDescription>
               </Alert>
+            )}
+            
+            {showResendOption && (
+              <div className="p-3 bg-background/80 border border-border rounded-md">
+                <p className="text-sm mb-2">Haven't received the verification email?</p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleResendVerification}
+                  disabled={resendLoading}
+                  className="flex items-center gap-2"
+                >
+                  <Mail className="h-4 w-4" />
+                  {resendLoading ? "Sending..." : "Resend verification email"}
+                </Button>
+                <p className="text-xs mt-2 text-muted-foreground">
+                  Make sure to check your spam/junk folder
+                </p>
+              </div>
             )}
             
             <form className="space-y-4" onSubmit={handleSignUp}>

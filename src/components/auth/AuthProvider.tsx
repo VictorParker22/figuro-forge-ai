@@ -92,8 +92,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Pre-signIn global sign out error (non-critical):", err);
       }
       
+      // Log the attempt for debugging
+      console.log("Attempting sign-in with email:", email);
+      
       // Attempt to sign in
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      console.log("Sign-in response:", error ? "Error" : "Success", error || data);
       
       if (error) {
         const friendlyError = getAuthErrorMessage(error);
@@ -105,14 +110,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: friendlyError };
       }
       
-      // Force page reload to ensure clean state
-      if (data.user) {
-        // Optional: You can force a page reload here if needed
-        // window.location.href = '/';
-      }
+      toast({
+        title: "Signed in successfully",
+      });
       
       return { error: null };
     } catch (error: any) {
+      console.error("Sign-in exception:", error);
       const friendlyError = getAuthErrorMessage(error);
       toast({
         title: "Error signing in",
@@ -136,14 +140,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Pre-signUp global sign out error (non-critical):", err);
       }
       
+      console.log("Attempting sign-up with email:", email);
+      
+      // Make sure we have the correct redirect URL
+      const origin = window.location.origin || 'http://localhost:5173';
+      const redirectTo = `${origin}/complete-profile`;
+      console.log("Using redirect URL:", redirectTo);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { plan: 'free' },
-          emailRedirectTo: `${window.location.origin}/complete-profile`
+          emailRedirectTo: redirectTo
         }
       });
+      
+      console.log("Sign-up response:", error ? "Error" : "Success", error || data);
       
       if (error) {
         const friendlyError = getAuthErrorMessage(error);
@@ -159,13 +172,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast({
           title: isEmailVerificationRequired ? "Verification email sent" : "Signup successful",
           description: isEmailVerificationRequired 
-            ? "Please check your email to confirm your account before signing in."
+            ? "Please check your email (including spam folder) to confirm your account before signing in."
             : "Your account has been created successfully.",
         });
       }
       
       return { error: null, data };
     } catch (error: any) {
+      console.error("Sign-up exception:", error);
       const friendlyError = getAuthErrorMessage(error);
       toast({
         title: "Error signing up",
@@ -205,10 +219,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clean up existing auth state first
       cleanupAuthState();
       
+      const origin = window.location.origin || 'http://localhost:5173';
+      const redirectTo = `${origin}/complete-profile`;
+      console.log("Using Google redirect URL:", redirectTo);
+      
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/complete-profile`
+          redirectTo: redirectTo
         }
       });
     } catch (error: any) {
@@ -223,10 +241,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const resendVerificationEmail = async (email: string) => {
     try {
+      console.log("Resending verification email to:", email);
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email,
       });
+      
+      console.log("Resend response:", error ? "Error" : "Success", error || "Email sent");
       
       if (error) {
         const friendlyError = getAuthErrorMessage(error);
@@ -240,11 +261,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       toast({
         title: "Verification email sent",
-        description: "Please check your inbox for the verification link.",
+        description: "Please check your inbox (including spam folder) for the verification link.",
       });
       
       return { error: null };
     } catch (error: any) {
+      console.error("Resend verification exception:", error);
       const friendlyError = getAuthErrorMessage(error);
       toast({
         title: "Error sending verification email",

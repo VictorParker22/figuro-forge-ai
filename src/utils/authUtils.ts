@@ -32,7 +32,7 @@ export const getAuthErrorMessage = (error: any): string => {
   
   // Handle common auth error scenarios
   if (errorMessage.includes('Email not confirmed')) {
-    return 'Please verify your email before signing in. Check your inbox for the verification link.';
+    return 'Please verify your email before signing in. Check your inbox (and spam folder) for the verification link.';
   }
   
   if (errorMessage.includes('Invalid login')) {
@@ -49,4 +49,13 @@ export const getAuthErrorMessage = (error: any): string => {
   
   // Return the original error if no specific handling
   return errorMessage;
+};
+
+/**
+ * Check if an error is related to email verification
+ */
+export const isEmailVerificationError = (error: string): boolean => {
+  return error.includes('verify your email') || 
+         error.includes('Email not confirmed') || 
+         error.includes('confirmation');
 };
