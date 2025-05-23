@@ -103,51 +103,6 @@ export const loadModelFromUrl = (
 };
 
 /**
- * Load a model directly from a Blob, bypassing the queue system
- * This is a fast path for blob URLs to avoid race conditions
- * @param blob The blob containing the model data
- * @returns Promise that resolves to the loaded THREE.Group
- */
-export const loadModelFromBlob = (blob: Blob): Promise<THREE.Group> => {
-  return new Promise<THREE.Group>((resolve, reject) => {
-    console.log("[loadModelFromBlob] Loading model from blob directly");
-    
-    // Create temporary object URL
-    const objectUrl = URL.createObjectURL(blob);
-    
-    // Create loader instance
-    const loader = new GLTFLoader();
-    
-    // Start loading the model
-    loader.load(
-      objectUrl,
-      (gltf) => {
-        console.log("[loadModelFromBlob] Model loaded successfully");
-        
-        // Important: Revoke URL only after successful load
-        URL.revokeObjectURL(objectUrl);
-        
-        resolve(gltf.scene);
-      },
-      (progress) => {
-        const percent = Math.round((progress.loaded / progress.total) * 100);
-        if (percent % 20 === 0 || percent === 100) {
-          console.log(`[loadModelFromBlob] Loading progress: ${percent}%`);
-        }
-      },
-      (error) => {
-        console.error("[loadModelFromBlob] Error loading model:", error);
-        
-        // Always revoke the URL on error
-        URL.revokeObjectURL(objectUrl);
-        
-        reject(error);
-      }
-    );
-  });
-};
-
-/**
  * Try to load a model with CORS proxy if direct loading fails
  * @param modelUrl Original URL to try loading from
  * @param options Loading options
