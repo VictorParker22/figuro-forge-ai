@@ -1,8 +1,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { useToast } from "@/hooks/use-toast";
+import { loadModelWithFallback, createObjectUrl, revokeObjectUrl } from "../utils/modelLoaderUtils";
+import { cleanupResources } from "../utils/resourceManager";
 
 interface UseModelLoaderProps {
   modelSource: string | null;
@@ -16,7 +17,6 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
   const { toast } = useToast();
   
   // Refs to track resources and prevent memory leaks
-  const loaderRef = useRef<GLTFLoader | null>(null);
   const isLoadingRef = useRef<boolean>(false);
   const controllerRef = useRef<AbortController | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -59,10 +59,6 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
     setLoading(true);
     isLoadingRef.current = true;
     
-    // Create a single loader instance
-    const loader = new GLTFLoader();
-    loaderRef.current = loader;
-    
     const loadModel = async () => {
       try {
         let modelUrl: string;
@@ -72,11 +68,11 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
         if (modelBlob) {
           // It's a Blob object, create an object URL
           if (objectUrlRef.current) {
-            URL.revokeObjectURL(objectUrlRef.current);
+            revokeObjectUrl(objectUrlRef.current);
             objectUrlRef.current = null;
           }
           
-          objectUrlRef.current = URL.createObjectURL(modelBlob);
+          objectUrlRef.current = createObjectUrl(modelBlob);
           modelUrl = objectUrlRef.current;
           shouldRevokeUrl = true;
           console.log("Created and loading from blob object URL:", modelUrl);
@@ -91,37 +87,12 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
           return;
         }
         
-        // Load the model
-        const loadWithUrl = (url: string) => {
-          return new Promise<THREE.Group>((resolve, reject) => {
-            loader.load(
-              url,
-              (gltf) => {
-                if (controllerRef.current?.signal.aborted) {
-                  console.log("Load operation was aborted");
-                  reject(new Error("Load operation aborted"));
-                  return;
-                }
-                console.log("Model loaded successfully from:", url);
-                resolve(gltf.scene);
-              },
-              (progress) => {
-                if (!controllerRef.current?.signal.aborted) {
-                  console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
-                }
-              },
-              (error) => {
-                if (controllerRef.current?.signal.aborted) return;
-                console.error("Error loading model:", error);
-                reject(error);
-              }
-            );
-          });
-        };
-        
         try {
-          // Try direct loading
-          const scene = await loadWithUrl(modelUrl);
+          // Load the model with fallback strategy
+          const scene = await loadModelWithFallback(modelUrl, {
+            signal: controllerRef.current?.signal
+          });
+          
           setModel(scene);
           setLoading(false);
           isLoadingRef.current = false;
@@ -129,47 +100,18 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
             title: "Model loaded",
             description: "3D model loaded successfully",
           });
-        } catch (directError) {
+        } catch (error) {
           if (controllerRef.current?.signal.aborted) return;
           
-          // If it's a string URL and not a blob URL, try with CORS proxy
-          if (typeof modelSource === 'string' && !modelSource.startsWith('blob:') && !modelBlob) {
-            try {
-              const proxyUrl = `https://cors-proxy.fringe.zone/${encodeURIComponent(modelSource)}`;
-              console.log("Trying with CORS proxy:", proxyUrl);
-              
-              const scene = await loadWithUrl(proxyUrl);
-              setModel(scene);
-              setLoading(false);
-              isLoadingRef.current = false;
-              toast({
-                title: "Model loaded",
-                description: "3D model loaded successfully using proxy",
-              });
-            } catch (proxyError) {
-              if (controllerRef.current?.signal.aborted) return;
-              console.error("All loading attempts failed");
-              onError(proxyError || directError);
-              setLoading(false);
-              isLoadingRef.current = false;
-              toast({
-                title: "Loading failed",
-                description: "Failed to load the 3D model. Please try downloading it instead.",
-                variant: "destructive",
-              });
-            }
-          } else {
-            // For blob URLs or blob objects, just report the error
-            console.error("Failed to load from blob:", directError);
-            onError(directError);
-            setLoading(false);
-            isLoadingRef.current = false;
-            toast({
-              title: "Loading failed",
-              description: "Failed to load the 3D model. The file might be corrupted.",
-              variant: "destructive",
-            });
-          }
+          console.error("Failed to load model:", error);
+          onError(error);
+          setLoading(false);
+          isLoadingRef.current = false;
+          toast({
+            title: "Loading failed",
+            description: "Failed to load the 3D model. Please try downloading it instead.",
+            variant: "destructive",
+          });
         }
       } catch (error) {
         if (controllerRef.current?.signal.aborted) return;
@@ -185,56 +127,10 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
     // Cleanup function
     return () => {
       console.log("Cleanup: Disposing model resources");
-      
-      // Abort any in-progress loads
-      if (controllerRef.current) {
-        controllerRef.current.abort();
-        controllerRef.current = null;
-      }
-      
-      // Clean up the model
-      if (model) {
-        model.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
-            if (mesh.geometry) {
-              console.log("Disposing geometry");
-              mesh.geometry.dispose();
-            }
-            if (mesh.material) {
-              if (Array.isArray(mesh.material)) {
-                mesh.material.forEach((material) => {
-                  console.log("Disposing material (array)");
-                  material.dispose();
-                });
-              } else {
-                console.log("Disposing material");
-                mesh.material.dispose();
-              }
-            }
-          }
-        });
-        
-        // Remove all children to ensure proper cleanup
-        while (model.children.length > 0) {
-          const child = model.children[0];
-          model.remove(child);
-        }
-      }
-      
-      // Revoke object URL if we created one
-      if (objectUrlRef.current) {
-        try {
-          URL.revokeObjectURL(objectUrlRef.current);
-          console.log("Revoked object URL:", objectUrlRef.current);
-          objectUrlRef.current = null;
-        } catch (error) {
-          console.error("Error revoking object URL:", error);
-        }
-      }
-      
+      cleanupResources(model, objectUrlRef.current, controllerRef.current);
       isLoadingRef.current = false;
-      loaderRef.current = null;
+      objectUrlRef.current = null;
+      controllerRef.current = null;
     };
   }, [modelSource, modelBlob, onError, toast, model]);
   
