@@ -28,7 +28,7 @@ const Hero = () => {
             animate={{ y: 0 }}
             transition={{ delay: 0.2, duration: 0.8 }}
           >
-            Create custom 3D figurines with AI
+            Transform Your Ideas Into Physical Art
           </motion.h1>
           
           <motion.p 
@@ -37,7 +37,7 @@ const Hero = () => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            Generate, customize, and 3D print your own figurine designs with Figuro.AI
+            Figuro.AI turns your imagination into stunning 3D figurines with just a text prompt. Design, customize, and bring your creations to life.
           </motion.p>
           
           <motion.div
@@ -49,7 +49,7 @@ const Hero = () => {
             <form onSubmit={handleSubmit}>
               <div className="flex rounded-md overflow-hidden bg-white/5 border border-white/10 focus-within:border-white/20">
                 <Input 
-                  placeholder="Describe your figurine idea..."
+                  placeholder="Describe your dream figurine..."
                   className="bg-transparent border-0 ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-white/90 flex-1"
                 />
                 <Button type="submit" className="bg-figuro-accent hover:bg-figuro-accent-hover rounded-none px-4">
@@ -58,7 +58,7 @@ const Hero = () => {
               </div>
             </form>
             <p className="text-white/50 text-sm mt-3">
-              Start creating custom figurines in seconds. No credit card required.
+              From concept to collectible in minutes. No design skills needed.
             </p>
           </motion.div>
         </div>
