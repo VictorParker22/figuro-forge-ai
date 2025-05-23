@@ -12,16 +12,12 @@ interface Model3DProps {
 
 const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
   // Create a stable ID for this model with better uniqueness
-  const modelIdRef = useRef<string>(`model3d-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`);
+  const modelIdRef = useRef<string>(`model3d-${Math.random().toString(36).substring(2, 10)}`);
   
   // Extract model name from URL for better logging
-  const modelName = modelSource 
-    ? modelSource.split('/').pop()?.split('?')[0] || 'unknown-model' 
-    : modelBlob 
-      ? 'blob-model' 
-      : 'no-model';
+  const modelName = modelSource ? modelSource.split('/').pop()?.split('?')[0] || 'unknown-model' : 'blob-model';
   
-  console.log(`[Model3D] Initializing for model: ${modelName}, ID: ${modelIdRef.current}`);
+  console.log(`Loading model: ${modelName}, ID: ${modelIdRef.current}`);
   
   const { loading, model } = useModelLoader({ 
     modelSource, 
@@ -33,16 +29,9 @@ const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
   // Debug logging for tracking model load status
   useEffect(() => {
     if (model) {
-      console.log(`[Model3D] Model successfully loaded: ${modelName}, ID: ${modelIdRef.current}`);
+      console.log(`Model successfully loaded: ${modelName}`);
     }
   }, [model, modelName]);
-  
-  // Make sure to clean up on unmount
-  useEffect(() => {
-    return () => {
-      console.log(`[Model3D] Component unmounting for ${modelIdRef.current}`);
-    };
-  }, []);
   
   if (loading) {
     return <LoadingSpinner />;
