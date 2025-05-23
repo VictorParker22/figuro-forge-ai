@@ -1,5 +1,8 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { modelQueueManager } from "../model-viewer/utils/modelQueueManager";
+import { webGLContextTracker } from "../model-viewer/utils/resourceManager";
 
 // Maximum number of model viewers that can be open at once
 const MAX_ACTIVE_VIEWERS = 1;
@@ -12,11 +15,15 @@ export const useModelViewer = () => {
   // Keep track of active model viewers to limit resource usage
   const activeViewersRef = useRef<number>(0);
 
-  // Clean up WebGL context when component unmounts or when model viewers are closed
+  // Configure the queue manager when component mounts
   useEffect(() => {
+    // Set concurrent loading limit
+    modelQueueManager.setMaxConcurrent(2);
+    
     return () => {
       // Reset active viewers count when component unmounts
       activeViewersRef.current = 0;
+      modelQueueManager.reset();
     };
   }, []);
 
@@ -32,15 +39,26 @@ export const useModelViewer = () => {
       return;
     }
     
+    // Check if we're nearing WebGL context limits
+    if (webGLContextTracker.isNearingLimit()) {
+      toast({
+        title: "Resource limit warning",
+        description: "Browser is nearing WebGL context limit. Performance may be affected.",
+        variant: "default",
+      });
+    }
+    
     setViewingModel(modelUrl);
     setModelViewerOpen(true);
     activeViewersRef.current += 1;
+    webGLContextTracker.registerContext();
   };
   
   // Handle closing model viewer and cleaning up resources
   const handleCloseModelViewer = () => {
     setModelViewerOpen(false);
     activeViewersRef.current = Math.max(0, activeViewersRef.current - 1);
+    webGLContextTracker.releaseContext();
   };
   
   return {
