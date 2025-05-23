@@ -1,4 +1,3 @@
-
 import { formatStylePrompt } from "@/lib/huggingface";
 import { SUPABASE_PUBLISHABLE_KEY, supabase } from "@/integrations/supabase/client";
 import { generateImageWithEdge } from "@/lib/edgeFunction";
