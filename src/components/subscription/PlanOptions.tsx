@@ -7,7 +7,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "@/hooks/use-toast";
 
 export const PlanOptions = () => {
-  const { subscription, isLoading, subscribeToPlan, openCustomerPortal } = useSubscription();
+  const { subscription, isLoading, subscribeToPlan, openCustomerPortal, user } = useSubscription();
   const [processingPlan, setProcessingPlan] = React.useState<string | null>(null);
   
   const plans = [
@@ -68,7 +68,7 @@ export const PlanOptions = () => {
 
   const handlePlanAction = async (planId) => {
     try {
-      if (!subscription?.user) {
+      if (!user) {
         toast({
           title: "Login Required",
           description: "Please sign in or create an account to subscribe.",
