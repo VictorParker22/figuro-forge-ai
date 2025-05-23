@@ -17,8 +17,8 @@ export const useModelViewer = () => {
 
   // Configure the queue manager when component mounts
   useEffect(() => {
-    // Set concurrent loading limit
-    modelQueueManager.setMaxConcurrent(2);
+    // Set concurrent loading limit to 1 to reduce errors
+    modelQueueManager.setMaxConcurrent(1);
     
     return () => {
       // Reset active viewers count when component unmounts
@@ -40,7 +40,7 @@ export const useModelViewer = () => {
     // Allow a short timeout for cleanup before allowing another open
     setTimeout(() => {
       console.log("Model viewer resources released");
-    }, 300);
+    }, 500); // Increased from 300 to 500ms
   };
 
   // Handle opening full model viewer
@@ -68,13 +68,13 @@ export const useModelViewer = () => {
     if (modelViewerOpen) {
       handleCloseModelViewer();
       
-      // Short timeout to ensure cleanup before opening new model
+      // Increased timeout to ensure cleanup before opening new model
       setTimeout(() => {
         setViewingModel(modelUrl);
         setModelViewerOpen(true);
         activeViewersRef.current += 1;
         webGLContextTracker.registerContext();
-      }, 300);
+      }, 500);
     } else {
       setViewingModel(modelUrl);
       setModelViewerOpen(true);

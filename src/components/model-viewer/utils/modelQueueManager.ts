@@ -5,7 +5,7 @@
 class ModelQueueManager {
   private static instance: ModelQueueManager;
   private loadingCount = 0;
-  private maxConcurrent = 2; // Maximum number of models loading at once
+  private maxConcurrent = 1; // Reduced from 2 to 1 to prevent loading too many models at once
   private queue: Array<() => Promise<unknown>> = [];
   private activeLoaders = new Set<string>();
   private abortControllers = new Map<string, AbortController>();
@@ -51,7 +51,7 @@ class ModelQueueManager {
         }
         
         // Process queue in case there are pending items
-        this.processQueue();
+        setTimeout(() => this.processQueue(), 100);
       } catch (error) {
         console.error(`Error aborting model load for ${modelId}:`, error);
       }
@@ -93,13 +93,20 @@ class ModelQueueManager {
           resolve(result);
           return result;
         } catch (error) {
-          console.error(`[Queue] Error loading model ${modelId}:`, error);
-          reject(error);
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            console.log(`[Queue] Loading of model ${modelId} was aborted`);
+            reject(error);
+          } else {
+            console.error(`[Queue] Error loading model ${modelId}:`, error);
+            reject(error);
+          }
         } finally {
           this.loadingCount--;
           this.activeLoaders.delete(modelId);
           this.abortControllers.delete(modelId);
-          this.processQueue();
+          
+          // Add a small delay before processing the next item to avoid thrashing
+          setTimeout(() => this.processQueue(), 150);
         }
       };
 
@@ -127,7 +134,7 @@ class ModelQueueManager {
         if (nextLoad) {
           setTimeout(() => {
             nextLoad();
-          }, 50); // Small delay to prevent race conditions
+          }, 200); // Increased delay to prevent race conditions
         }
       }
     } finally {

@@ -33,6 +33,18 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
     setPreviewFailed(true);
   };
 
+  const handleDownloadClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDownload(file.url, file.name);
+  };
+
+  const handleViewClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onViewModel(file.url);
+  };
+
   return (
     <div className="glass-panel rounded-lg overflow-hidden group">
       <div className="aspect-square relative overflow-hidden bg-white/5">
@@ -61,7 +73,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
           <div className="p-4 w-full">
             {file.type === 'image' ? (
               <Button 
-                onClick={() => onDownload(file.url, file.name)}
+                onClick={handleDownloadClick}
                 className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
               >
                 <Download size={16} className="mr-2" /> Download
@@ -69,13 +81,13 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
             ) : (
               <div className="flex flex-col space-y-2 w-full">
                 <Button 
-                  onClick={() => onViewModel(file.url)}
+                  onClick={handleViewClick}
                   className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
                 >
                   <Eye size={16} className="mr-2" /> View Model
                 </Button>
                 <Button 
-                  onClick={() => onDownload(file.url, file.name)}
+                  onClick={handleDownloadClick}
                   variant="outline"
                   className="w-full border-white/10"
                 >

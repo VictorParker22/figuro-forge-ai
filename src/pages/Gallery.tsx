@@ -12,10 +12,12 @@ import ModelViewer from "@/components/model-viewer";
 import { useGalleryFiles } from "@/components/gallery/useGalleryFiles";
 import { useModelUpload } from "@/components/gallery/useModelUpload";
 import { useModelViewer } from "@/components/gallery/useModelViewer";
+import { useToast } from "@/hooks/use-toast";
 
 const Gallery = () => {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   // Use custom hooks to manage gallery functionality
   const { images, isLoading, fetchImagesFromBucket } = useGalleryFiles();
@@ -39,16 +41,41 @@ const Gallery = () => {
     navigate('/studio');
   };
   
-  const handleDownload = (imageUrl: string, imageName: string) => {
+  const handleDownload = async (imageUrl: string, imageName: string) => {
     if (!imageUrl) return;
     
-    // Create a temporary anchor element
-    const a = document.createElement('a');
-    a.href = imageUrl;
-    a.download = imageName || 'figurine.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      // Fetch the file as a blob
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      // Create an object URL for the blob
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = imageName || 'figurine.png';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+      toast({
+        title: "Download started",
+        description: `Downloading ${imageName || 'file'}`,
+        variant: "default"
+      });
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      toast({
+        title: "Download failed",
+        description: "There was a problem downloading the file",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

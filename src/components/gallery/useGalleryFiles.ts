@@ -51,11 +51,8 @@ export const useGalleryFiles = () => {
           .from('figurine-images')
           .getPublicUrl(fullPath);
         
-        // Add cache buster to force reload of models when updating
-        const cacheBuster = `?t=${Date.now()}`;
-        const url = publicUrlData.publicUrl.includes('?') 
-          ? `${publicUrlData.publicUrl}&cb=${cacheBuster.substring(1)}` 
-          : `${publicUrlData.publicUrl}${cacheBuster}`;
+        // Clean URL - don't add cache busters here as they can cause download issues
+        const url = publicUrlData.publicUrl;
         
         return {
           name: file.name,

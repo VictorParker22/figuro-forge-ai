@@ -26,11 +26,29 @@ const ModelContent = ({
   
   console.log(`ModelContent: Loading ${modelUrl}, visible: ${isVisible}, id: ${modelIdRef.current}`);
   
+  // Remove query parameters to prevent cache busting which causes reloads
+  const cleanUrl = useMemo(() => {
+    try {
+      const url = new URL(modelUrl);
+      // Remove cache-busting parameters but keep essential ones
+      if (url.searchParams.has('t')) {
+        url.searchParams.delete('t');
+      }
+      if (url.searchParams.has('cb')) {
+        url.searchParams.delete('cb');
+      }
+      return url.toString();
+    } catch (e) {
+      // If URL parsing fails, return the original
+      return modelUrl;
+    }
+  }, [modelUrl]);
+  
   const { loading, model, error } = useOptimizedModelLoader({ 
-    modelSource: modelUrl, 
+    modelSource: cleanUrl,
     visible: isVisible,
     modelId: modelIdRef.current,
-    onError: (err) => console.error(`Error loading model ${modelUrl}:`, err)
+    onError: (err) => console.error(`Error loading model ${cleanUrl}:`, err)
   });
   
   if (loading) {
@@ -38,7 +56,7 @@ const ModelContent = ({
   }
   
   if (error || !model) {
-    console.error(`Failed to load model: ${modelUrl}`, error);
+    console.error(`Failed to load model: ${cleanUrl}`, error);
     return <DummyBox />;
   }
   
@@ -57,9 +75,20 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   
   // Clean URL from query params for better caching
   const cleanModelUrl = useMemo(() => {
-    const url = new URL(modelUrl);
-    // Keep only necessary query parameters if any
-    return url.toString();
+    try {
+      const url = new URL(modelUrl);
+      // Remove cache-busting parameters but keep essential ones
+      if (url.searchParams.has('t')) {
+        url.searchParams.delete('t');
+      }
+      if (url.searchParams.has('cb')) {
+        url.searchParams.delete('cb');
+      }
+      return url.toString();
+    } catch (e) {
+      // If URL parsing fails, return the original
+      return modelUrl;
+    }
   }, [modelUrl]);
   
   // Handle errors silently by showing the placeholder
@@ -70,6 +99,11 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
 
   useEffect(() => {
     console.log(`ModelPreview ${fileName}: ${isIntersecting ? 'visible' : 'not visible'}, ever visible: ${wasEverVisible}`);
+    
+    return () => {
+      // Cleanup effect for when component unmounts
+      setHasError(false);
+    };
   }, [isIntersecting, wasEverVisible, fileName]);
 
   if (hasError) {
@@ -87,13 +121,14 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             id={canvasId.current}
             shadows 
             gl={{ 
-              powerPreference: "default",
+              powerPreference: "low-power", // Changed from "default" to "low-power" for better performance
               antialias: false, // Disable for performance
               depth: true,
               stencil: false,
               alpha: true
             }}
-            dpr={[1, 1.5]} // Limit resolution for performance
+            dpr={[1, 1.2]} // Further limit resolution for performance (was [1, 1.5])
+            style={{pointerEvents: "none"}} // Disable pointer events to prevent interaction in gallery view
           >
             <color attach="background" args={['#1a1a1a']} />
             <ambientLight intensity={0.5} />
@@ -109,7 +144,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
               autoRotateSpeed={4}
               enablePan={false}
               enableZoom={false}
-              enableRotate={true}
+              enableRotate={false} // Disabled rotation for gallery view
             />
             <Environment preset="sunset" />
           </Canvas>
