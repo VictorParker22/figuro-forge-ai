@@ -9,6 +9,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -26,8 +30,17 @@ const UpgradeModal = ({
   actionType,
 }: UpgradeModalProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleUpgrade = () => {
+    // If user is not authenticated, send to login page first
+    if (!user) {
+      onOpenChange(false);
+      navigate("/auth");
+      return;
+    }
+    
     onOpenChange(false);
     navigate("/pricing");
   };
@@ -63,8 +76,12 @@ const UpgradeModal = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Maybe Later
           </Button>
-          <Button onClick={handleUpgrade} className="bg-figuro-accent hover:bg-figuro-accent-hover">
-            View Pricing Plans
+          <Button 
+            onClick={handleUpgrade} 
+            className="bg-figuro-accent hover:bg-figuro-accent-hover"
+            disabled={isLoading}
+          >
+            {isLoading ? "Processing..." : "View Pricing Plans"}
           </Button>
         </DialogFooter>
       </DialogContent>

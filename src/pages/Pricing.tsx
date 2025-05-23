@@ -1,562 +1,248 @@
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Check, Info } from "lucide-react";
-import { useSubscription } from "@/hooks/useSubscription";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import SEO from "@/components/SEO";
-import { pageSEO } from "@/config/seo";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Check, X } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+
+const pricingPlans = [
+  {
+    id: "free",
+    name: "Free",
+    price: "$0",
+    features: [
+      { name: "3 Image Generations / Month", included: true },
+      { name: "1 Model Conversion / Month", included: true },
+      { name: "Basic Art Styles", included: true },
+      { name: "Standard Resolution", included: true },
+      { name: "Personal Use License", included: true },
+      { name: "Commercial License", included: false },
+      { name: "Priority Support", included: false },
+    ],
+    buttonText: "Current Plan",
+  },
+  {
+    id: "starter",
+    name: "Starter",
+    price: "$9.99",
+    features: [
+      { name: "20 Image Generations / Month", included: true },
+      { name: "5 Model Conversions / Month", included: true },
+      { name: "All Art Styles", included: true },
+      { name: "High Resolution", included: true },
+      { name: "Personal Use License", included: true },
+      { name: "Commercial License", included: false },
+      { name: "Priority Support", included: false },
+    ],
+    buttonText: "Subscribe",
+    recommended: true,
+  },
+  {
+    id: "pro",
+    name: "Professional",
+    price: "$24.99",
+    features: [
+      { name: "100 Image Generations / Month", included: true },
+      { name: "20 Model Conversions / Month", included: true },
+      { name: "All Art Styles", included: true },
+      { name: "Ultra High Resolution", included: true },
+      { name: "Personal Use License", included: true },
+      { name: "Commercial License", included: true },
+      { name: "Priority Support", included: true },
+    ],
+    buttonText: "Subscribe",
+  },
+  {
+    id: "unlimited",
+    name: "Unlimited",
+    price: "$49.99",
+    features: [
+      { name: "Unlimited Image Generations", included: true },
+      { name: "Unlimited Model Conversions", included: true },
+      { name: "All Art Styles + Beta Features", included: true },
+      { name: "Ultra High Resolution", included: true },
+      { name: "Personal Use License", included: true },
+      { name: "Commercial License", included: true },
+      { name: "Priority Support", included: true },
+    ],
+    buttonText: "Subscribe",
+  },
+];
 
 const Pricing = () => {
-  const {
-    subscription,
-    isLoading,
-    user,
-    checkSubscription,
-    subscribeToPlan,
-    openCustomerPortal,
-  } = useSubscription();
-  const [commercialLicense, setCommercialLicense] = useState(false);
-  const [additionalConversions, setAdditionalConversions] = useState(0);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [searchParams] = useSearchParams();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
-
-  // Check if we have a successful payment
+  const [searchParams] = useSearchParams();
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
+  const currentPlan = profile?.plan || "free";
+  const success = searchParams.get("success");
+  const canceled = searchParams.get("canceled");
+  
+  // Show toast messages for Stripe redirects
   useEffect(() => {
-    const success = searchParams.get("success");
-    const sessionId = searchParams.get("session_id");
-    
-    if (success === "true" && sessionId) {
+    if (success === "true") {
       toast({
-        title: "Subscription Activated",
-        description: "Your subscription has been successfully activated.",
+        title: "Subscription activated!",
+        description: "Your plan has been activated successfully.",
       });
-      
-      // Remove query params
-      navigate("/pricing", { replace: true });
-      
-      // Refresh subscription after a short delay to allow the webhook to process
-      setTimeout(() => {
-        checkSubscription();
-      }, 2000);
+    } else if (canceled === "true") {
+      toast({
+        title: "Subscription canceled",
+        description: "You can subscribe at any time.",
+      });
+    }
+  }, [success, canceled]);
+  
+  const handleSubscribe = async (planId: string) => {
+    if (planId === currentPlan) {
+      return; // Already on this plan
     }
     
-    const canceled = searchParams.get("canceled");
-    if (canceled === "true") {
-      toast({
-        title: "Subscription Canceled",
-        description: "Your subscription process was canceled.",
-        variant: "destructive",
-      });
-      
-      // Remove query params
-      navigate("/pricing", { replace: true });
-    }
-  }, [searchParams, navigate, toast, checkSubscription]);
-
-  // Handle plan selection and subscription
-  const handleSelectPlan = (planId: string) => {
+    // If user is not logged in, redirect to auth page
     if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to subscribe to a plan",
-        variant: "destructive",
-      });
+      navigate("/auth");
       return;
     }
     
-    setSelectedPlan(planId);
-    
-    // If it's the free plan or the current plan, don't show confirmation dialog
-    if (planId === "free" || (subscription && subscription.plan === planId)) {
-      handleConfirmSubscription();
-    } else {
-      setConfirmDialogOpen(true);
-    }
-  };
-
-  const handleConfirmSubscription = async () => {
-    if (!selectedPlan) return;
-    
-    setConfirmDialogOpen(false);
-    
-    const addOns = {
-      commercialLicense: commercialLicense,
-      additionalConversions: additionalConversions,
-    };
-    
-    // Subscribe to the selected plan
-    await subscribeToPlan(selectedPlan as any, addOns);
-  };
-
-  const calculateTotalPrice = (basePriceInCents: number) => {
-    let total = basePriceInCents;
-    
-    if (commercialLicense) {
-      total += 1000; // $10 for commercial license
+    // If user selects free plan, no need for payment
+    if (planId === "free") {
+      // Functionality for downgrading to free plan would go here
+      return;
     }
     
-    if (additionalConversions > 0) {
-      total += additionalConversions * 500; // $5 per 10 additional conversions
-    }
+    setLoadingPlanId(planId);
     
-    return (total / 100).toFixed(2);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: {
+          plan: planId,
+          successUrl: `${window.location.origin}/pricing?success=true`,
+          cancelUrl: `${window.location.origin}/pricing?canceled=true`
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (data?.url) {
+        // Open Stripe checkout in a new tab
+        window.open(data.url, '_blank');
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create checkout session",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPlanId(null);
+    }
   };
-
-  // Pricing plans data
-  const plans = [
-    {
-      id: "free",
-      name: "Free",
-      price: "$0",
-      period: "forever",
-      description: "Get started with basic figurine creation",
-      features: [
-        "3 image generations per month",
-        "1 model conversion per month",
-        "Basic art styles",
-        "Standard resolution",
-        "Community support",
-      ],
-      basePriceInCents: 0,
-    },
-    {
-      id: "starter",
-      name: "Starter",
-      price: "$12",
-      period: "per month",
-      description: "For enthusiasts and hobbyists",
-      features: [
-        "100 image generations per month",
-        "20 model conversions per month",
-        "All art styles",
-        "High resolution",
-        "Priority support",
-      ],
-      basePriceInCents: 1200,
-    },
-    {
-      id: "pro",
-      name: "Pro",
-      price: "$29",
-      period: "per month",
-      description: "For serious creators and artists",
-      features: [
-        "300 image generations per month",
-        "60 model conversions per month",
-        "Custom art styles",
-        "Ultra high resolution",
-        "Priority rendering",
-        "Dedicated support",
-      ],
-      basePriceInCents: 2900,
-    },
-    {
-      id: "unlimited",
-      name: "Unlimited",
-      price: "$59",
-      period: "per month",
-      description: "For professional studios and businesses",
-      features: [
-        "Unlimited image generations",
-        "Unlimited model conversions (fair use policy)",
-        "All art styles and custom requests",
-        "Ultra high resolution",
-        "Priority rendering",
-        "Commercial usage available",
-        "API access",
-        "Dedicated account manager",
-      ],
-      basePriceInCents: 5900,
-    },
-  ];
-
-  // Handle sign in
-  const handleSignIn = () => {
-    // In a real app, redirect to the login page
-    toast({
-      title: "Authentication Required",
-      description: "Please sign in to subscribe to a premium plan",
-    });
-  };
-
+  
   return (
     <div className="min-h-screen bg-figuro-dark">
-      <SEO 
-        title={pageSEO.pricing.title}
-        description={pageSEO.pricing.description}
-        keywords={pageSEO.pricing.keywords}
-        ogType={pageSEO.pricing.ogType}
-      />
       <Header />
       
-      <section className="pt-32 pb-20">
+      <section className="pt-32 pb-24">
         <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-16"
-          >
-            <h1 className="text-3xl md:text-5xl font-bold mb-6 text-gradient">Pricing Plans</h1>
-            <p className="text-lg text-white/70 max-w-3xl mx-auto">
-              Choose the perfect plan for your needs. All plans include access to our AI-powered figurine generation platform.
-            </p>
-          </motion.div>
+          <h1 className="text-4xl font-bold mb-8 text-center text-white">
+            Choose Your Plan
+          </h1>
           
-          {subscription && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="mb-12"
-            >
-              <div className="glass-panel rounded-xl p-6 max-w-3xl mx-auto">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-xl font-semibold text-white mb-2">
-                      Your Subscription: <span className="text-figuro-accent">{subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)}</span>
-                    </h2>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/70">Image Generations:</span>
-                        <span className="font-semibold text-white">{subscription.usage.image_generations_used} / {subscription.limits.image_generations_limit}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/70">Model Conversions:</span>
-                        <span className="font-semibold text-white">{subscription.usage.model_conversions_used} / {subscription.limits.model_conversions_limit}</span>
-                      </div>
-                    </div>
-                    {subscription.commercial_license && (
-                      <div className="mb-2">
-                        <span className="inline-block px-2 py-1 rounded bg-green-500/20 text-green-300 text-xs">Commercial License</span>
-                      </div>
-                    )}
-                    {subscription.plan !== "free" && (
-                      <p className="text-sm text-white/60">
-                        Renews: {subscription.valid_until ? new Date(subscription.valid_until).toLocaleDateString() : "N/A"}
-                      </p>
-                    )}
-                  </div>
-                  {subscription.plan !== "free" && (
-                    <Button 
-                      onClick={openCustomerPortal}
-                      variant="outline"
-                      className="border-white/10 hover:border-white/30"
-                    >
-                      Manage Subscription
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
+          <p className="text-xl text-center mb-12 text-white/80 max-w-3xl mx-auto">
+            Unlock advanced features and higher limits with our premium plans.
+          </p>
           
-          {isLoading ? (
-            <div className="text-center py-12">
-              <div className="spinner h-8 w-8 border-4 border-figuro-accent/50 border-t-figuro-accent rounded-full mx-auto animate-spin"></div>
-              <p className="mt-4 text-white/70">Loading subscription details...</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-7xl mx-auto">
-                {plans.map((plan, index) => (
-                  <motion.div
-                    key={plan.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                    className={`glass-panel rounded-xl p-8 relative ${
-                      subscription && subscription.plan === plan.id
-                        ? "border-figuro-accent ring-1 ring-figuro-accent/50"
-                        : "border-white/10"
-                    }`}
-                  >
-                    {subscription && subscription.plan === plan.id && (
-                      <div className="absolute -top-3 left-0 right-0 flex justify-center">
-                        <span className="bg-figuro-accent text-black text-xs font-semibold px-3 py-1 rounded-full">
-                          Current Plan
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="mb-6">
-                      <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
-                      <div className="flex items-end mb-2">
-                        <span className="text-3xl font-bold text-white">{plan.price}</span>
-                        <span className="text-white/70 ml-1">/{plan.period}</span>
-                      </div>
-                      <p className="text-white/70">{plan.description}</p>
-                    </div>
-                    
-                    <ul className="mb-8 space-y-3">
-                      {plan.features.map((feature, i) => (
-                        <li key={i} className="flex items-start">
-                          <Check className="mr-2 h-5 w-5 text-figuro-accent shrink-0" />
-                          <span className="text-white/80">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    
-                    <Button 
-                      className={`w-full ${
-                        subscription && subscription.plan === plan.id
-                          ? "bg-green-600 hover:bg-green-700"
-                          : plan.id === "pro" || plan.id === "unlimited"
-                          ? "bg-figuro-accent hover:bg-figuro-accent-hover"
-                          : ""
-                      }`}
-                      variant={
-                        subscription && subscription.plan === plan.id
-                          ? "default"
-                          : plan.id === "pro" || plan.id === "unlimited"
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() => handleSelectPlan(plan.id)}
-                      disabled={(subscription && subscription.plan === plan.id) || isLoading}
-                    >
-                      {subscription && subscription.plan === plan.id
-                        ? "Current Plan"
-                        : user
-                        ? "Subscribe"
-                        : "Sign In to Subscribe"}
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
-              
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.6 }}
-                className="mt-16 max-w-4xl mx-auto"
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {pricingPlans.map((plan) => (
+              <Card 
+                key={plan.id}
+                className={`flex flex-col ${
+                  plan.recommended 
+                    ? "border-2 border-figuro-accent" 
+                    : "border border-gray-200"
+                } ${
+                  currentPlan === plan.id
+                    ? "bg-gray-100/10"
+                    : ""
+                }`}
               >
-                <h2 className="text-2xl font-bold mb-6 text-gradient text-center">Add-ons & Feature Comparison</h2>
-                
-                <div className="glass-panel rounded-xl p-6 mb-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 text-white">Add-ons</h3>
-                      
-                      <div className="space-y-6">
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center">
-                              <h4 className="font-medium text-white">Commercial License</h4>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Info className="h-4 w-4 text-white/50 ml-2" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Permission to use models commercially and resell</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                            <span className="text-white font-medium">+$10/month</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Switch 
-                              id="commercial-license"
-                              checked={commercialLicense}
-                              disabled={!user || (subscription?.commercial_license)}
-                              onCheckedChange={setCommercialLicense}
-                            />
-                            <Label htmlFor="commercial-license" className="text-white/70">
-                              {subscription?.commercial_license ? "Included in your plan" : "Add commercial license"}
-                            </Label>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center">
-                              <h4 className="font-medium text-white">Additional Conversions</h4>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Info className="h-4 w-4 text-white/50 ml-2" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Add 10 more 3D model conversions per month</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                            <span className="text-white font-medium">+$5 per 10 conversions</span>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              disabled={!user || additionalConversions <= 0}
-                              onClick={() => setAdditionalConversions(Math.max(0, additionalConversions - 1))}
-                            >
-                              -
-                            </Button>
-                            <span className="text-white">{additionalConversions * 10} conversions</span>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              disabled={!user || additionalConversions >= 10}
-                              onClick={() => setAdditionalConversions(additionalConversions + 1)}
-                            >
-                              +
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 text-white">Features by Plan</h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-white/70">Feature</TableHead>
-                            <TableHead className="text-white/70 text-right">Free</TableHead>
-                            <TableHead className="text-white/70 text-right">Paid Plans</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <TableRow>
-                            <TableCell className="text-white">Priority Rendering</TableCell>
-                            <TableCell className="text-right">❌</TableCell>
-                            <TableCell className="text-right">✅</TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="text-white">Custom Art Styles</TableCell>
-                            <TableCell className="text-right">❌</TableCell>
-                            <TableCell className="text-right">✅</TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="text-white">High Resolution</TableCell>
-                            <TableCell className="text-right">❌</TableCell>
-                            <TableCell className="text-right">✅</TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="text-white">API Access</TableCell>
-                            <TableCell className="text-right">❌</TableCell>
-                            <TableCell className="text-right">Unlimited Only</TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
+                {plan.recommended && (
+                  <div className="bg-figuro-accent text-white text-center py-1 text-sm font-medium">
+                    RECOMMENDED
                   </div>
-                </div>
-              </motion.div>
-            </>
-          )}
-          
-          {!user && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
-              className="mt-12 text-center"
-            >
-              <p className="text-white/70 mb-4">You need to sign in to subscribe to a plan</p>
-              <Button onClick={handleSignIn} className="bg-figuro-accent hover:bg-figuro-accent-hover">
-                Sign In
-              </Button>
-            </motion.div>
-          )}
-        </div>
-      </section>
-      
-      <section className="py-16 bg-gradient-to-b from-transparent to-figuro-accent/5">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="glass-panel rounded-xl p-8 md:p-12 max-w-4xl mx-auto"
-          >
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div>
-                <h2 className="text-2xl font-bold mb-2 text-gradient">Need a custom solution?</h2>
-                <p className="text-white/70">
-                  Contact our team for customized pricing and solutions tailored to your specific requirements.
-                </p>
-              </div>
-              <Button className="whitespace-nowrap bg-figuro-accent hover:bg-figuro-accent-hover">
-                Contact Sales
-              </Button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-      
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Subscription</DialogTitle>
-            <DialogDescription>
-              You're about to subscribe to the {selectedPlan?.charAt(0).toUpperCase() + selectedPlan?.slice(1)} plan.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedPlan && (
-            <div className="py-4">
-              <p className="font-semibold text-lg mb-4">
-                Total: ${calculateTotalPrice(plans.find(p => p.id === selectedPlan)?.basePriceInCents || 0)}/month
-              </p>
-              <div className="space-y-2">
-                <p>• {selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} Plan</p>
-                {commercialLicense && <p>• Commercial License (+$10/month)</p>}
-                {additionalConversions > 0 && (
-                  <p>• {additionalConversions * 10} Additional Conversions (+${(additionalConversions * 5).toFixed(2)}/month)</p>
                 )}
-              </div>
-              <p className="mt-4 text-sm text-muted-foreground">
-                You'll be redirected to Stripe to complete your purchase.
-              </p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
-              Cancel
+                {currentPlan === plan.id && !plan.recommended && (
+                  <div className="bg-gray-600 text-white text-center py-1 text-sm font-medium">
+                    CURRENT PLAN
+                  </div>
+                )}
+                <CardHeader>
+                  <CardTitle>{plan.name}</CardTitle>
+                  <CardDescription>
+                    <span className="text-2xl font-bold">{plan.price}</span>
+                    {plan.id !== "free" && <span className="text-sm ml-1">/month</span>}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <ul className="space-y-3">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-center">
+                        {feature.included ? (
+                          <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+                        )}
+                        <span className="text-sm">{feature.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    onClick={() => handleSubscribe(plan.id)}
+                    className={`w-full ${
+                      currentPlan === plan.id 
+                        ? "bg-gray-500"
+                        : plan.recommended 
+                          ? "bg-figuro-accent hover:bg-figuro-accent-hover" 
+                          : ""
+                    }`}
+                    disabled={currentPlan === plan.id || loadingPlanId === plan.id}
+                  >
+                    {loadingPlanId === plan.id 
+                      ? "Processing..." 
+                      : currentPlan === plan.id 
+                        ? "Current Plan" 
+                        : plan.buttonText}
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+          
+          <div className="mt-16 text-center">
+            <h2 className="text-2xl font-bold mb-4 text-white">
+              Need Something Custom?
+            </h2>
+            <p className="text-lg mb-6 text-white/80 max-w-2xl mx-auto">
+              Contact us for custom enterprise solutions or specific requirements.
+            </p>
+            <Button size="lg" variant="outline" className="border-white/30 hover:border-white">
+              Contact Sales
             </Button>
-            <Button onClick={handleConfirmSubscription}>
-              Subscribe
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </section>
       
       <Footer />
     </div>

@@ -13,3 +13,18 @@ verify_jwt = false
 
 [functions.increment]
 verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.customer-portal]
+verify_jwt = true
+
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.check-subscription]
+verify_jwt = true
+
+[functions.webhook-stripe]
+verify_jwt = false

@@ -1,50 +1,53 @@
+import React, { Suspense } from 'react';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+} from "react-router-dom";
+import { HelmetProvider } from 'react-helmet-async';
+import { Toaster } from "@/hooks/use-toast"
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { HelmetProvider } from "react-helmet-async";
-import StructuredData from "@/components/StructuredData";
-import { structuredData } from "@/config/seo";
-import Index from "./pages/Index";
-import Studio from "./pages/Studio";
-import Gallery from "./pages/Gallery"; 
-import Solutions from "./pages/Solutions";
-import Resources from "./pages/Resources";
-import Community from "./pages/Community";
-import Pricing from "./pages/Pricing";
-import Docs from "./pages/Docs";
-import NotFound from "./pages/NotFound";
+import Index from "@/pages/Index";
+import Features from "@/pages/Features";
+import Solutions from "@/pages/Solutions";
+import Pricing from "@/pages/Pricing";
+import Gallery from "@/pages/Gallery";
+import Community from "@/pages/Community";
+import Resources from "@/pages/Resources";
+import Docs from "@/pages/Docs";
+import NotFound from "@/pages/NotFound";
+import Studio from "@/pages/Studio";
 
-const queryClient = new QueryClient();
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import Auth from "@/pages/Auth";
+import CompleteProfile from "@/pages/CompleteProfile";
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
+function App() {
+  return (
     <HelmetProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        {/* Global Organization Structured Data */}
-        <StructuredData type="Organization" data={structuredData.organization} />
-        {/* Global WebApplication Structured Data */}
-        <StructuredData type="WebApplication" data={structuredData.webApplication} />
+      <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/studio" element={<Studio />} />
-            <Route path="/gallery" element={<Gallery />} />
-            <Route path="/solutions" element={<Solutions />} />
-            <Route path="/resources" element={<Resources />} />
-            <Route path="/community" element={<Community />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/docs" element={<Docs />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/features" element={<Features />} />
+              <Route path="/solutions" element={<Solutions />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/gallery" element={<Gallery />} />
+              <Route path="/community" element={<Community />} />
+              <Route path="/resources" element={<Resources />} />
+              <Route path="/docs" element={<Docs />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/complete-profile" element={<CompleteProfile />} />
+              <Route path="/studio" element={<Studio />} />
+              <Route path="/*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+          <Toaster />
         </BrowserRouter>
-      </TooltipProvider>
+      </AuthProvider>
     </HelmetProvider>
-  </QueryClientProvider>
-);
+  );
+}
 
 export default App;

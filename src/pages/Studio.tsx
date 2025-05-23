@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -14,6 +13,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react";
 import UploadModelModal from "@/components/UploadModelModal";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useNavigate } from "react-router-dom";
 
 const Studio = () => {
   const [apiKey, setApiKey] = useState<string | "">("");
@@ -36,6 +38,10 @@ const Studio = () => {
     conversionProgress,
     conversionError
   } = useImageGeneration();
+
+  const { user: authUser, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { canPerformAction, trackAction } = useUsageTracking();
 
   // Check for authenticated user
   useEffect(() => {
@@ -85,12 +91,79 @@ const Studio = () => {
     setCustomModelUrl(null);
     setCustomModelFile(null);
     
+    // Check if user can perform action
+    if (!authUser) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to generate images",
+      });
+      navigate("/auth");
+      return;
+    }
+    
+    const canGenerate = canPerformAction("image_generation");
+    if (!canGenerate) {
+      // Show upgrade modal
+      setShowApiInput(false); // Hide API input if shown
+      toast({
+        title: "Usage limit reached",
+        description: "You've reached your monthly image generation limit",
+        variant: "destructive",
+      });
+      // Show upgrade modal with appropriate settings
+      // ... your existing modal code
+      return;
+    }
+    
+    // Track usage
+    const tracked = await trackAction("image_generation");
+    if (!tracked) {
+      return;
+    }
+    
     // Call the handleGenerate function directly
     const result = await handleGenerate(prompt, style, apiKey);
     
     if (result.needsApiKey) {
       setShowApiInput(true);
     }
+  };
+  
+  // Handle model conversion with usage tracking
+  const handleConvertWithUsageTracking = async () => {
+    if (!generatedImage) {
+      return;
+    }
+    
+    if (!authUser) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to convert models",
+      });
+      navigate("/auth");
+      return;
+    }
+    
+    const canConvert = canPerformAction("model_conversion");
+    if (!canConvert) {
+      toast({
+        title: "Usage limit reached",
+        description: "You've reached your monthly model conversion limit",
+        variant: "destructive",
+      });
+      // Show upgrade modal with appropriate settings
+      // ... your existing modal code
+      return;
+    }
+    
+    // Track usage
+    const tracked = await trackAction("model_conversion");
+    if (!tracked) {
+      return;
+    }
+    
+    // Call the original conversion function
+    await handleConvertTo3D();
   };
 
   // Handle model upload from modal
@@ -104,7 +177,7 @@ const Studio = () => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     toast({
       title: "Signed out",
       description: "You have been signed out successfully",
@@ -112,13 +185,7 @@ const Studio = () => {
   };
 
   const handleSignIn = () => {
-    // In a real app, redirect to the login page
-    toast({
-      title: "Authentication required",
-      description: "Please sign in to save your figurines",
-    });
-    // For now, we'll just show a toast
-    // window.location.href = "/login";
+    navigate("/auth");
   };
 
   // Determine which model URL to display - custom or generated
@@ -144,9 +211,9 @@ const Studio = () => {
             </Button>
             
             <div className="flex items-center gap-4">
-              {user ? (
+              {authUser ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-white">Welcome, {user.email}</span>
+                  <span className="text-white">Welcome, {authUser.email}</span>
                   <Button onClick={handleSignOut} variant="outline" className="border-white/10">
                     Sign Out
                   </Button>
@@ -179,7 +246,7 @@ const Studio = () => {
               <ImagePreview 
                 imageSrc={generatedImage} 
                 isLoading={isGeneratingImage}
-                onConvertTo3D={handleConvertTo3D}
+                onConvertTo3D={handleConvertWithUsageTracking} // Use the new function here
                 isConverting={isConverting}
                 generationMethod={generationMethod}
               />
@@ -196,7 +263,7 @@ const Studio = () => {
             </div>
           </div>
           
-          {user && (
+          {authUser && (
             <div className="mt-16">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gradient">Your Figurine Collection</h2>
