@@ -18,6 +18,9 @@ import Resources from "@/pages/Resources";
 import Docs from "@/pages/Docs";
 import NotFound from "@/pages/NotFound";
 import Studio from "@/pages/Studio";
+import Profile from "@/pages/Profile";
+import ProfileFigurines from "@/pages/ProfileFigurines";
+import Settings from "@/pages/Settings";
 
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import Auth from "@/pages/Auth";
@@ -41,6 +44,9 @@ function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/complete-profile" element={<CompleteProfile />} />
               <Route path="/studio" element={<Studio />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/figurines" element={<ProfileFigurines />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/*" element={<NotFound />} />
             </Routes>
           </Suspense>
