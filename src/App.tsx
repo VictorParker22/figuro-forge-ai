@@ -1,3 +1,4 @@
+
 import React, { Suspense } from 'react';
 import {
   BrowserRouter,
@@ -5,7 +6,7 @@ import {
   Route,
 } from "react-router-dom";
 import { HelmetProvider } from 'react-helmet-async';
-import { Toaster } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster";
 
 import Index from "@/pages/Index";
 import Features from "@/pages/Features";

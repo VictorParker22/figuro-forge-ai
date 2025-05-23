@@ -39,12 +39,11 @@ export const useUsageTracking = () => {
         // Get plan from profile
         const planType = profile?.plan || "free";
         
-        // Get today's usage
+        // Get user's usage
         const { data, error } = await supabase
-          .from("usage_tracking")
+          .from("user_usage")
           .select("*")
           .eq("user_id", user.id)
-          .eq("date", today)
           .single();
         
         if (error && error.code !== "PGRST116") { // PGRST116 is record not found
@@ -54,20 +53,28 @@ export const useUsageTracking = () => {
         // If no usage record, create one
         if (!data) {
           const { data: newRecord, error: insertError } = await supabase
-            .from("usage_tracking")
+            .from("user_usage")
             .insert({
               user_id: user.id,
-              date: today,
-              image_count: 0,
-              model_count: 0
+              image_generations_used: 0,
+              model_conversions_used: 0
             })
             .select()
             .single();
           
           if (insertError) throw insertError;
-          setUsage(newRecord);
+          
+          // Map to our usage format
+          setUsage({
+            image_count: newRecord.image_generations_used || 0,
+            model_count: newRecord.model_conversions_used || 0
+          });
         } else {
-          setUsage(data);
+          // Map to our usage format
+          setUsage({
+            image_count: data.image_generations_used || 0,
+            model_count: data.model_conversions_used || 0
+          });
         }
         
         // Set limits based on user's plan
@@ -108,22 +115,26 @@ export const useUsageTracking = () => {
     }
     
     try {
-      const updateData = actionType === "image_generation"
-        ? { image_count: usage.image_count + 1 }
-        : { model_count: usage.model_count + 1 };
+      const updateField = actionType === "image_generation"
+        ? { image_generations_used: usage.image_count + 1 }
+        : { model_conversions_used: usage.model_count + 1 };
       
       const { data, error } = await supabase
-        .from("usage_tracking")
-        .update(updateData)
+        .from("user_usage")
+        .update(updateField)
         .eq("user_id", user.id)
-        .eq("date", today)
         .select()
         .single();
       
       if (error) throw error;
       
       // Update local state
-      setUsage(data);
+      setUsage({
+        ...usage,
+        image_count: actionType === "image_generation" ? usage.image_count + 1 : usage.image_count,
+        model_count: actionType === "model_conversion" ? usage.model_count + 1 : usage.model_count
+      });
+      
       return true;
     } catch (error) {
       console.error("Error tracking usage:", error);
