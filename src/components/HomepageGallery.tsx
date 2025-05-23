@@ -1,35 +1,18 @@
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { motion } from "framer-motion";
-import { fetchPublicFigurines } from "@/services/figurineService";
-import { Figurine } from "@/types/figurine";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Image, Box } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useGalleryFiles } from "@/components/gallery/useGalleryFiles";
 
 const HomepageGallery: React.FC = () => {
-  const [figurines, setFigurines] = useState<Figurine[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { images, isLoading } = useGalleryFiles();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const loadFigurines = async () => {
-      try {
-        setIsLoading(true);
-        const data = await fetchPublicFigurines();
-        console.log("Loaded figurines:", data);
-        // Limit to 10 items
-        setFigurines(data.slice(0, 10));
-      } catch (error) {
-        console.error("Error loading figurines:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadFigurines();
-  }, []);
+  
+  // Limit to 10 items for homepage display
+  const limitedImages = images.slice(0, 10);
 
   const navigateToGallery = () => {
     navigate("/gallery");
@@ -65,12 +48,12 @@ const HomepageGallery: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : figurines.length > 0 ? (
+        ) : limitedImages.length > 0 ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
-              {figurines.map((figurine, index) => (
+              {limitedImages.map((file, index) => (
                 <motion.div
-                  key={figurine.id}
+                  key={file.id}
                   className="glass-panel overflow-hidden aspect-square relative group"
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
@@ -79,8 +62,8 @@ const HomepageGallery: React.FC = () => {
                 >
                   <div className="w-full h-full">
                     <img
-                      src={figurine.saved_image_url || figurine.image_url}
-                      alt={figurine.title || "Figurine"}
+                      src={file.url}
+                      alt={file.name}
                       className="w-full h-full object-cover"
                       loading="lazy"
                     />
@@ -88,16 +71,16 @@ const HomepageGallery: React.FC = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
                     <div className="p-3 w-full">
                       <p className="text-xs text-white/90 truncate font-medium mb-1">
-                        {figurine.title || "Untitled Figurine"}
+                        {file.name || "Untitled"}
                       </p>
                       <div className="flex items-center gap-1">
-                        {figurine.model_url ? (
+                        {file.type === '3d-model' ? (
                           <Box size={12} className="text-figuro-accent" />
                         ) : (
                           <Image size={12} className="text-white/70" />
                         )}
                         <span className="text-xs text-white/70">
-                          {figurine.model_url ? "3D Model" : "Image"}
+                          {file.type === '3d-model' ? "3D Model" : "Image"}
                         </span>
                       </div>
                     </div>
@@ -116,7 +99,7 @@ const HomepageGallery: React.FC = () => {
           </>
         ) : (
           <div className="text-center py-16">
-            <p className="text-white/70">No figurines found. Be the first to create one!</p>
+            <p className="text-white/70">No images found in the gallery yet. Be the first to create one!</p>
             <Button
               onClick={navigateToStudio}
               className="mt-4 bg-figuro-accent hover:bg-figuro-accent-hover"
