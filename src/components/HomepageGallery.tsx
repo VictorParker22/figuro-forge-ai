@@ -100,18 +100,15 @@ const HomepageGallery: React.FC = () => {
                       />
                     )}
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
-                    <div className="p-3 w-full">
-                      <p className="text-xs text-white/90 truncate font-medium mb-1">
-                        {file.name || "Untitled"}
-                      </p>
-                      <div className="flex items-center gap-1">
+                  <div className="absolute inset-0 backdrop-blur-md bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center">
+                    <div className="p-4 w-full flex flex-col items-center">
+                      <div className="flex items-center gap-1 mb-2">
                         {file.type === '3d-model' ? (
-                          <Box size={12} className="text-figuro-accent" />
+                          <Box size={14} className="text-figuro-accent" />
                         ) : (
-                          <Image size={12} className="text-white/70" />
+                          <Image size={14} className="text-white/70" />
                         )}
-                        <span className="text-xs text-white/70">
+                        <span className="text-xs text-white/90">
                           {file.type === '3d-model' ? "3D Model" : "Image"}
                         </span>
                       </div>
@@ -120,9 +117,9 @@ const HomepageGallery: React.FC = () => {
                         <Button
                           onClick={() => handleViewModel(file.url)}
                           size="sm"
-                          className="w-full mt-2 bg-figuro-accent hover:bg-figuro-accent-hover h-8 px-2"
+                          className="w-full bg-figuro-accent hover:bg-figuro-accent-hover h-8 px-3"
                         >
-                          <Eye size={14} className="mr-1" /> View Model
+                          <Eye size={14} className="mr-1.5" /> View Model
                         </Button>
                       )}
                     </div>
