@@ -2,14 +2,27 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Image, Box } from "lucide-react";
+import { ArrowRight, Image, Box, Eye, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGalleryFiles } from "@/components/gallery/useGalleryFiles";
+import ModelPreview from "@/components/gallery/ModelPreview";
+import ModelPlaceholder from "@/components/gallery/ModelPlaceholder";
+import ModelViewerDialog from "@/components/gallery/ModelViewerDialog";
+import { useModelViewer } from "@/components/gallery/useModelViewer";
 
 const HomepageGallery: React.FC = () => {
   const { images, isLoading } = useGalleryFiles();
   const navigate = useNavigate();
+  
+  // Set up model viewer functionality
+  const { 
+    viewingModel, 
+    modelViewerOpen, 
+    setModelViewerOpen, 
+    handleViewModel, 
+    handleCloseModelViewer 
+  } = useModelViewer();
   
   // Limit to 10 items for homepage display
   const limitedImages = images.slice(0, 10);
@@ -20,6 +33,18 @@ const HomepageGallery: React.FC = () => {
 
   const navigateToStudio = () => {
     navigate("/studio");
+  };
+  
+  // Handle downloads (if needed)
+  const handleDownload = (imageUrl: string, imageName: string) => {
+    if (!imageUrl) return;
+    
+    const a = document.createElement('a');
+    a.href = imageUrl;
+    a.download = imageName || 'figurine.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -61,12 +86,19 @@ const HomepageGallery: React.FC = () => {
                   viewport={{ once: true }}
                 >
                   <div className="w-full h-full">
-                    <img
-                      src={file.url}
-                      alt={file.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
+                    {file.type === '3d-model' ? (
+                      <ModelPreview 
+                        modelUrl={file.url} 
+                        fileName={file.name} 
+                      />
+                    ) : (
+                      <img
+                        src={file.url}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
                     <div className="p-3 w-full">
@@ -83,6 +115,16 @@ const HomepageGallery: React.FC = () => {
                           {file.type === '3d-model' ? "3D Model" : "Image"}
                         </span>
                       </div>
+                      
+                      {file.type === '3d-model' && (
+                        <Button
+                          onClick={() => handleViewModel(file.url)}
+                          size="sm"
+                          className="w-full mt-2 bg-figuro-accent hover:bg-figuro-accent-hover h-8 px-2"
+                        >
+                          <Eye size={14} className="mr-1" /> View Model
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -109,6 +151,14 @@ const HomepageGallery: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* Model Viewer Dialog for 3D models */}
+      <ModelViewerDialog
+        open={modelViewerOpen}
+        onOpenChange={setModelViewerOpen}
+        modelUrl={viewingModel}
+        onClose={handleCloseModelViewer}
+      />
     </section>
   );
 };
