@@ -1,5 +1,6 @@
+
 import { formatStylePrompt } from "@/lib/huggingface";
-import { SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { SUPABASE_PUBLISHABLE_KEY, supabase } from "@/integrations/supabase/client";
 import { generateImageWithEdge } from "@/lib/edgeFunction";
 
 // Track if the edge function is available
@@ -27,6 +28,25 @@ const setEdgeFunctionStatus = (isAvailable: boolean): void => {
       localStorage.removeItem("edgeFunctionAvailable");
       isEdgeFunctionAvailable = null;
     }, 60 * 60 * 1000); // 1 hour
+  }
+};
+
+// Increment the global stats counter
+const incrementImageGenerationCount = async (): Promise<void> => {
+  try {
+    await fetch(`${window.location.origin}/functions/v1/increment`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY || ''}`
+      },
+      body: JSON.stringify({ 
+        table_name: 'stats',
+        id: 'image_generations',
+      }),
+    });
+  } catch (error) {
+    console.error("Failed to increment generation counter:", error);
   }
 };
 
@@ -96,6 +116,8 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
             
             // Check if the JSON contains an image URL
             if (jsonData.url) {
+              // Increment the image generation counter
+              await incrementImageGenerationCount();
               return { blob: null, url: jsonData.url, method: "edge" };
             } else {
               throw new Error("No image data returned");
@@ -109,6 +131,9 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
         try {
           const imageBlob = await response.blob();
           const imageUrl = URL.createObjectURL(imageBlob);
+          
+          // Increment the image generation counter
+          await incrementImageGenerationCount();
           
           return { blob: imageBlob, url: imageUrl, method: "edge" };
         } catch (blobError) {
@@ -141,6 +166,10 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
       // Fetch the blob from the URL
       const blobResponse = await fetch(edgeResult.imageUrl);
       const blob = await blobResponse.blob();
+      
+      // Increment the image generation counter
+      await incrementImageGenerationCount();
+      
       return {
         blob,
         url: edgeResult.imageUrl,

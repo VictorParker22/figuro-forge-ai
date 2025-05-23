@@ -78,12 +78,33 @@ export type Database = {
         }
         Relationships: []
       }
+      stats: {
+        Row: {
+          count: number
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          count?: number
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          count?: number
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_stat: {
+        Args: { stat_id: string; inc_amount?: number }
+        Returns: number
+      }
     }
     Enums: {
       art_style:
