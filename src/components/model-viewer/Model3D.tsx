@@ -1,5 +1,5 @@
 
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import { Center } from "@react-three/drei";
 import LoadingSpinner from "./LoadingSpinner";
 import { useModelLoader } from "./hooks/useModelLoader";
@@ -25,6 +25,13 @@ const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
     modelId: modelIdRef.current,
     onError 
   });
+
+  // Debug logging for tracking model load status
+  useEffect(() => {
+    if (model) {
+      console.log(`Model successfully loaded: ${modelName}`);
+    }
+  }, [model, modelName]);
   
   if (loading) {
     return <LoadingSpinner />;

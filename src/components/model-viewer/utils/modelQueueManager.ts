@@ -9,6 +9,7 @@ class ModelQueueManager {
   private queue: Array<() => Promise<unknown>> = [];
   private activeLoaders = new Set<string>();
   private abortControllers = new Map<string, AbortController>();
+  private processingQueue = false;
 
   private constructor() {}
 
@@ -43,6 +44,14 @@ class ModelQueueManager {
         this.abortControllers.get(modelId)?.abort();
         this.abortControllers.delete(modelId);
         this.activeLoaders.delete(modelId);
+        
+        // Reduce loading count if this was an active loader
+        if (this.loadingCount > 0) {
+          this.loadingCount--;
+        }
+        
+        // Process queue in case there are pending items
+        this.processQueue();
       } catch (error) {
         console.error(`Error aborting model load for ${modelId}:`, error);
       }
@@ -59,13 +68,14 @@ class ModelQueueManager {
     return new Promise((resolve, reject) => {
       // If already loading this model, reject
       if (this.activeLoaders.has(modelId)) {
-        reject(new Error("Model is already being loaded"));
+        reject(new Error(`Model ${modelId} is already being loaded`));
         return;
       }
 
       const executeLoad = async () => {
         if (this.loadingCount >= this.maxConcurrent) {
           // Queue for later if too many concurrent loads
+          console.log(`[Queue] Delaying load of ${modelId}, current loads: ${this.loadingCount}/${this.maxConcurrent}`);
           this.queue.push(executeLoad);
           return;
         }
@@ -107,11 +117,33 @@ class ModelQueueManager {
    * Process the next item in the queue
    */
   private processQueue(): void {
-    if (this.queue.length > 0 && this.loadingCount < this.maxConcurrent) {
-      console.log(`[Queue] Processing next in queue, remaining: ${this.queue.length}`);
-      const nextLoad = this.queue.shift();
-      nextLoad?.();
+    if (this.processingQueue) return;
+    this.processingQueue = true;
+    
+    try {
+      if (this.queue.length > 0 && this.loadingCount < this.maxConcurrent) {
+        console.log(`[Queue] Processing next in queue, remaining: ${this.queue.length}`);
+        const nextLoad = this.queue.shift();
+        if (nextLoad) {
+          setTimeout(() => {
+            nextLoad();
+          }, 50); // Small delay to prevent race conditions
+        }
+      }
+    } finally {
+      this.processingQueue = false;
     }
+  }
+
+  /**
+   * Get current queue status
+   */
+  public getStatus(): { loading: number, queued: number, maxConcurrent: number } {
+    return {
+      loading: this.loadingCount,
+      queued: this.queue.length,
+      maxConcurrent: this.maxConcurrent
+    };
   }
 
   /**
@@ -132,6 +164,7 @@ class ModelQueueManager {
     this.loadingCount = 0;
     this.activeLoaders.clear();
     this.abortControllers.clear();
+    console.log("[Queue] Queue manager reset");
   }
 }
 

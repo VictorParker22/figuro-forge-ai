@@ -20,34 +20,52 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
   const currentSourceRef = useRef<string | Blob | null>(null);
   const [stableSource, setStableSource] = useState<string | null>(modelUrl);
   const [stableBlob, setStableBlob] = useState<Blob | null>(modelBlob || null);
+  const [loadKey, setLoadKey] = useState<string>(`load-${Date.now()}`);
   
   // Stabilize the source to prevent rapid changes
   useEffect(() => {
-    // Determine if there's been an actual change in modelUrl
+    // Only update if there's been a significant change in modelUrl
+    // and it's different from what we're currently tracking
     if (modelUrl !== currentSourceRef.current) {
       console.log("ModelScene: URL source changed to", modelUrl);
+      
+      // Clear any previous timeouts
+      const current = currentSourceRef.current;
       currentSourceRef.current = modelUrl;
       
-      // Small delay to ensure stable updates
-      const timer = setTimeout(() => {
-        setStableSource(modelUrl);
-      }, 50);
-      
-      return () => clearTimeout(timer);
+      // If this is a completely new URL (not just undefined → undefined)
+      if (modelUrl || (current !== null && modelUrl !== current)) {
+        // Generate new load key to force proper re-mounting
+        setLoadKey(`load-${Date.now()}`);
+        
+        // Small delay to ensure stable updates and prevent thrashing
+        const timer = setTimeout(() => {
+          setStableSource(modelUrl);
+          // Clear blob when URL changes
+          if (modelUrl) setStableBlob(null);
+        }, 100);
+        
+        return () => clearTimeout(timer);
+      }
     }
   }, [modelUrl]);
   
   // Separate effect for blob changes to prevent dependencies conflicts
   useEffect(() => {
-    // Only update if the blob itself has changed
+    // Only update if the blob itself has changed and is not null
     if (modelBlob && modelBlob !== currentSourceRef.current) {
       console.log("ModelScene: Blob source changed");
+      
+      // Generate new load key to force proper re-mounting
+      setLoadKey(`load-${Date.now()}`);
       currentSourceRef.current = modelBlob;
       
       // Small delay to ensure stable updates
       const timer = setTimeout(() => {
         setStableBlob(modelBlob);
-      }, 50);
+        // Clear URL when blob changes
+        if (modelBlob) setStableSource(null);
+      }, 100);
       
       return () => clearTimeout(timer);
     }
@@ -60,7 +78,7 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
   };
 
   return (
-    <Canvas shadows>
+    <Canvas shadows key={loadKey}>
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <PerspectiveCamera makeDefault position={[0, 0, 5]} />

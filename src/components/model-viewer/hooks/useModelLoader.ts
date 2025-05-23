@@ -33,6 +33,7 @@ export const useModelLoader = ({
   
   // Add refs to track current source to prevent infinite loops
   const currentSourceRef = useRef<string | Blob | null>(null);
+  const loadAttemptRef = useRef<number>(0);
 
   useEffect(() => {
     console.log(`useModelLoader: Effect triggered for ${modelIdRef.current}`);
@@ -46,13 +47,26 @@ export const useModelLoader = ({
     
     // Check if the same source is being loaded again to prevent infinite loops
     const newSource = modelBlob || modelSource;
-    if (newSource === currentSourceRef.current && model) {
+    const sourceKey = modelBlob ? 'blob-source' : modelSource;
+    
+    if (sourceKey === currentSourceRef.current && model) {
       console.log(`Same model source detected for ${modelIdRef.current}, skipping reload`);
       return;
     }
     
+    // Limit load attempts to prevent infinite loops
+    if (loadAttemptRef.current > 3) {
+      console.log(`Too many load attempts for ${modelIdRef.current}, aborting`);
+      setLoading(false);
+      onError(new Error("Too many load attempts"));
+      return;
+    }
+    
+    loadAttemptRef.current += 1;
+    console.log(`Load attempt ${loadAttemptRef.current} for ${modelIdRef.current}`);
+    
     // Update current source reference
-    currentSourceRef.current = newSource;
+    currentSourceRef.current = sourceKey;
     
     // Abort previous load if in progress
     if (controllerRef.current) {
@@ -107,7 +121,14 @@ export const useModelLoader = ({
         const loadedModel = await modelQueueManager.queueModelLoad(
           modelIdRef.current,
           () => loadModelWithFallback(modelUrl, {
-            signal: controllerRef.current?.signal
+            signal: controllerRef.current?.signal,
+            onProgress: (progress) => {
+              // Optional progress tracking
+              const percent = Math.round((progress.loaded / progress.total) * 100);
+              if (percent % 25 === 0) { // Log only at 0%, 25%, 50%, 75%, 100%
+                console.log(`Loading progress for ${modelIdRef.current}: ${percent}%`);
+              }
+            }
           })
         );
         
@@ -119,6 +140,7 @@ export const useModelLoader = ({
         setModel(loadedModel);
         setLoading(false);
         isLoadingRef.current = false;
+        loadAttemptRef.current = 0; // Reset counter on success
         console.log(`Model ${modelIdRef.current} loaded successfully`);
         
       } catch (error) {
@@ -149,7 +171,7 @@ export const useModelLoader = ({
         objectUrlRef.current = null;
       }
     };
-  }, [modelSource, modelBlob, onError]);
+  }, [modelSource, modelBlob, onError, model]);
   
   // Clean up all resources when unmounting
   useEffect(() => {

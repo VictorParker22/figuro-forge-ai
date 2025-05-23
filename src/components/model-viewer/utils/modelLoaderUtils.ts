@@ -23,9 +23,20 @@ export const loadModelFromUrl = (
     // Create loader instance
     const loader = new GLTFLoader();
     
+    // Add a timeout to abort if loading takes too long
+    const timeoutId = setTimeout(() => {
+      if (!options?.signal?.aborted) {
+        const timeoutError = new Error(`Load operation timed out for ${url}`);
+        console.error(timeoutError);
+        reject(timeoutError);
+      }
+    }, 30000); // 30 second timeout
+    
     loader.load(
       url,
       (gltf) => {
+        clearTimeout(timeoutId);
+        
         if (options?.signal?.aborted) {
           console.log("Load operation was aborted");
           reject(new Error("Load operation aborted"));
@@ -36,11 +47,14 @@ export const loadModelFromUrl = (
       },
       (progress) => {
         if (!options?.signal?.aborted) {
-          console.log(`Loading progress: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+          const percent = Math.round((progress.loaded / progress.total) * 100);
+          console.log(`Loading progress: ${percent}%`);
           options?.onProgress?.(progress);
         }
       },
       (error) => {
+        clearTimeout(timeoutId);
+        
         if (options?.signal?.aborted) return;
         console.error("Error loading model:", error);
         reject(error);
@@ -74,8 +88,17 @@ export const loadModelWithFallback = async (
         return await loadModelFromUrl(proxyUrl, options);
       } catch (proxyError) {
         if (options?.signal?.aborted) throw proxyError;
-        console.error("All loading attempts failed");
-        throw proxyError || directError;
+        
+        // Try one more fallback proxy if the first one fails
+        try {
+          const backupProxyUrl = `https://corsproxy.io/?${encodeURIComponent(modelUrl)}`;
+          console.log("Trying with backup CORS proxy:", backupProxyUrl);
+          
+          return await loadModelFromUrl(backupProxyUrl, options);
+        } catch (backupProxyError) {
+          console.error("All loading attempts failed");
+          throw backupProxyError || proxyError || directError;
+        }
       }
     } else {
       // For blob URLs, just propagate the error
