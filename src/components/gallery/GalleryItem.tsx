@@ -1,8 +1,9 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Eye } from "lucide-react";
 import ModelPlaceholder from "./ModelPlaceholder";
+import ModelPreview from "./ModelPreview";
 
 interface BucketImage {
   name: string;
@@ -20,6 +21,18 @@ interface GalleryItemProps {
 }
 
 const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel }) => {
+  const [isPreviewLoaded, setIsPreviewLoaded] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
+
+  // Load state handlers
+  const handlePreviewLoaded = () => {
+    setIsPreviewLoaded(true);
+  };
+
+  const handlePreviewFailed = () => {
+    setPreviewFailed(true);
+  };
+
   return (
     <div className="glass-panel rounded-lg overflow-hidden group">
       <div className="aspect-square relative overflow-hidden bg-white/5">
@@ -31,7 +44,18 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
             loading="lazy"
           />
         ) : (
-          <ModelPlaceholder fileName={file.name} />
+          <div className="w-full h-full">
+            {!previewFailed ? (
+              <div className="w-full h-full" onLoad={handlePreviewLoaded}>
+                <ModelPreview 
+                  modelUrl={file.url} 
+                  fileName={file.name} 
+                />
+              </div>
+            ) : (
+              <ModelPlaceholder fileName={file.name} />
+            )}
+          </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
           <div className="p-4 w-full">

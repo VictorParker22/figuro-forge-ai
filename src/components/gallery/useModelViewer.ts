@@ -20,6 +20,7 @@ export const useModelViewer = () => {
     };
   }, []);
 
+  // Handle opening full model viewer
   const handleViewModel = (modelUrl: string) => {
     // Check if we're already at the maximum number of active viewers
     if (activeViewersRef.current >= MAX_ACTIVE_VIEWERS) {
@@ -36,6 +37,7 @@ export const useModelViewer = () => {
     activeViewersRef.current += 1;
   };
   
+  // Handle closing model viewer and cleaning up resources
   const handleCloseModelViewer = () => {
     setModelViewerOpen(false);
     activeViewersRef.current = Math.max(0, activeViewersRef.current - 1);
