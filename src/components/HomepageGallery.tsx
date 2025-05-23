@@ -18,6 +18,7 @@ const HomepageGallery: React.FC = () => {
       try {
         setIsLoading(true);
         const data = await fetchPublicFigurines();
+        console.log("Loaded figurines:", data);
         // Limit to 10 items
         setFigurines(data.slice(0, 10));
       } catch (error) {
@@ -32,6 +33,10 @@ const HomepageGallery: React.FC = () => {
 
   const navigateToGallery = () => {
     navigate("/gallery");
+  };
+
+  const navigateToStudio = () => {
+    navigate("/studio");
   };
 
   return (
@@ -111,9 +116,9 @@ const HomepageGallery: React.FC = () => {
           </>
         ) : (
           <div className="text-center py-16">
-            <p className="text-white/70">No figurines found.</p>
+            <p className="text-white/70">No figurines found. Be the first to create one!</p>
             <Button
-              onClick={() => navigate("/studio")}
+              onClick={navigateToStudio}
               className="mt-4 bg-figuro-accent hover:bg-figuro-accent-hover"
             >
               Create Your First Figurine
