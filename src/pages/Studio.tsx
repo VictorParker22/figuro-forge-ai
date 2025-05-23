@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -6,7 +7,7 @@ import ModelViewer from "@/components/model-viewer";
 import Footer from "@/components/Footer";
 import ApiKeyInput from "@/components/ApiKeyInput";
 import StudioHeader from "@/components/StudioHeader";
-import FigurineGallery from "@/components/FigurineGallery";
+import { FigurineGallery } from "@/components/figurine";
 import { useImageGeneration } from "@/hooks/useImageGeneration";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
