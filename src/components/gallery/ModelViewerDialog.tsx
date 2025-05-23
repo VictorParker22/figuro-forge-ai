@@ -31,6 +31,8 @@ const ModelViewerDialog: React.FC<ModelViewerDialogProps> = ({
   useEffect(() => {
     // Only update the URL if it changes significantly
     if (modelUrl && modelUrl !== stableModelUrl) {
+      console.log('ModelViewerDialog: Setting model URL:', modelUrl);
+      
       // Small delay to ensure stable updates
       const timer = setTimeout(() => {
         setStableModelUrl(modelUrl);
@@ -53,12 +55,17 @@ const ModelViewerDialog: React.FC<ModelViewerDialogProps> = ({
     onOpenChange(newOpen);
   };
 
+  // Extract model name for better UX
+  const modelName = stableModelUrl ? 
+    stableModelUrl.split('/').pop()?.split('?')[0] || '3D Model' : 
+    '3D Model';
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[800px] p-0 bg-gray-900/90 border border-white/10">
         <DialogHeader className="p-4 border-b border-white/10">
           <DialogTitle className="flex justify-between items-center">
-            <span>3D Model Viewer</span>
+            <span>3D Model Viewer: {modelName}</span>
             <DialogClose asChild>
               <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
                 <X size={16} />

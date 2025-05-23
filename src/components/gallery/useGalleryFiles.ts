@@ -12,7 +12,8 @@ export const useGalleryFiles = () => {
   // Helper function to determine file type based on extension
   const getFileType = (filename: string): 'image' | '3d-model' => {
     const extension = filename.split('.').pop()?.toLowerCase() || '';
-    if (extension === 'glb') {
+    // Check for common 3D model formats
+    if (['glb', 'gltf', 'fbx', 'obj', 'usdz'].includes(extension)) {
       return '3d-model';
     }
     return 'image';
@@ -50,10 +51,16 @@ export const useGalleryFiles = () => {
           .from('figurine-images')
           .getPublicUrl(fullPath);
         
+        // Add cache buster to force reload of models when updating
+        const cacheBuster = `?t=${Date.now()}`;
+        const url = publicUrlData.publicUrl.includes('?') 
+          ? `${publicUrlData.publicUrl}&cb=${cacheBuster.substring(1)}` 
+          : `${publicUrlData.publicUrl}${cacheBuster}`;
+        
         return {
           name: file.name,
           fullPath: fullPath,
-          url: publicUrlData.publicUrl,
+          url: url,
           id: file.id || fullPath,
           created_at: file.created_at || new Date().toISOString(),
           type: getFileType(file.name) // Determine file type based on extension

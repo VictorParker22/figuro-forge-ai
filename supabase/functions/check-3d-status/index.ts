@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
 
@@ -81,7 +80,7 @@ serve(async (req: Request) => {
         // Broadcast the webhook data to any connected SSE clients
         broadcastTaskUpdate(callbackTaskId, webhookData, webhookData.status || 'update');
         
-        // Store the update in Supabase for persistence
+        // Store the update in Supabase for persistence and handle model URL
         try {
           // Create Supabase client
           const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -90,14 +89,32 @@ serve(async (req: Request) => {
           if (supabaseUrl && supabaseServiceKey) {
             const supabase = createClient(supabaseUrl, supabaseServiceKey);
             
+            // Prepare the update data
+            const updateData: any = { 
+              status: webhookData.status || 'updated',
+              updated_at: new Date().toISOString(),
+              result_data: webhookData
+            };
+            
+            // Check if we have a model URL and completed status
+            if ((webhookData.status === 'completed' || webhookData.status === 'SUCCESS' || 
+                 webhookData.status === 'SUCCEEDED') && 
+                (webhookData.model_urls?.glb || webhookData.glb_url || 
+                 webhookData.model_url)) {
+              
+              // Extract the model URL from wherever it is in the webhook data
+              updateData.model_url = webhookData.model_urls?.glb || 
+                                    webhookData.glb_url || 
+                                    webhookData.glbUrl || 
+                                    webhookData.model_url;
+              
+              console.log(`Task ${callbackTaskId} completed with model URL: ${updateData.model_url}`);
+            }
+            
             // Update task status
             const { error } = await supabase
               .from('conversion_tasks')
-              .update({ 
-                status: webhookData.status || 'updated',
-                updated_at: new Date().toISOString(),
-                result_data: webhookData
-              })
+              .update(updateData)
               .eq('task_id', callbackTaskId);
               
             if (error) {
@@ -259,7 +276,7 @@ serve(async (req: Request) => {
                       statusData.glb_url || 
                       statusData.glbUrl || 
                       statusData.model_url
-                      
+                    
       if (modelUrl) {
         responseData.modelUrl = modelUrl
         responseData.success = true
@@ -269,6 +286,8 @@ serve(async (req: Request) => {
         if (statusData.texture_urls && statusData.texture_urls.length > 0) {
           responseData.textureUrls = statusData.texture_urls
         }
+        
+        console.log(`Task ${taskId} completed with model URL: ${modelUrl}`);
       }
     } else if (statusData.status === 'failed' || statusData.status === 'FAILED') {
       responseData.error = statusData.task_error?.message || statusData.message || 'Unknown error'

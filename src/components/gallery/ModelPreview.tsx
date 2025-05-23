@@ -1,5 +1,4 @@
-
-import React, { Suspense, useState, useRef, useEffect } from "react";
+import React, { Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Environment } from "@react-three/drei";
 import { ErrorBoundary } from "@/components/model-viewer/ErrorBoundary";
@@ -23,7 +22,9 @@ const ModelContent = ({
   isVisible: boolean 
 }) => {
   // Create a stable ID based on the URL to prevent reloads
-  const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.replace(/\.\w+$/, '')}`);
+  const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}`);
+  
+  console.log(`ModelContent: Loading ${modelUrl}, visible: ${isVisible}, id: ${modelIdRef.current}`);
   
   const { loading, model, error } = useOptimizedModelLoader({ 
     modelSource: modelUrl, 
@@ -37,6 +38,7 @@ const ModelContent = ({
   }
   
   if (error || !model) {
+    console.error(`Failed to load model: ${modelUrl}`, error);
     return <DummyBox />;
   }
   
@@ -53,11 +55,22 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
     once: true // Only observe once, then disconnect to prevent re-intersection triggers
   });
   
+  // Clean URL from query params for better caching
+  const cleanModelUrl = useMemo(() => {
+    const url = new URL(modelUrl);
+    // Keep only necessary query parameters if any
+    return url.toString();
+  }, [modelUrl]);
+  
   // Handle errors silently by showing the placeholder
   const handleError = (error: any) => {
     console.error(`ModelPreview error for ${fileName}:`, error);
     setHasError(true);
   };
+
+  useEffect(() => {
+    console.log(`ModelPreview ${fileName}: ${isIntersecting ? 'visible' : 'not visible'}, ever visible: ${wasEverVisible}`);
+  }, [isIntersecting, wasEverVisible, fileName]);
 
   if (hasError) {
     return <ModelPlaceholder fileName={fileName} />;
@@ -88,7 +101,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
             
             <Suspense fallback={<LoadingSpinner />}>
-              <ModelContent modelUrl={modelUrl} isVisible={isIntersecting || wasEverVisible} />
+              <ModelContent modelUrl={cleanModelUrl} isVisible={isIntersecting || wasEverVisible} />
             </Suspense>
             
             <OrbitControls 

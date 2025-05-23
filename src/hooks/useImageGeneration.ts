@@ -1,9 +1,9 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { saveFigurine, updateFigurineWithModelUrl } from "@/services/figurineService";
 import { generateImage } from "@/services/generationService";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { downloadAndSaveModel } from "@/utils/modelUtils";
 
 export const useImageGeneration = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -138,26 +138,62 @@ export const useImageGeneration = () => {
       }
     });
 
-    eventSource.addEventListener('completed', (event: any) => {
+    eventSource.addEventListener('completed', async (event: any) => {
       try {
         const data = JSON.parse(event.data);
         console.log('SSE completed event:', data);
         
         // Handle completion
         if (data.modelUrl) {
-          setModelUrl(data.modelUrl);
-          setIsConverting(false);
-          setConversionProgress(100);
-          setConversionError(null); // Clear any existing errors
-          
-          toast({
-            title: "3D model created",
-            description: "Your figurine is ready to view in 3D",
-          });
-          
-          // Update figurine with model URL if we have one
-          if (currentFigurineId) {
-            updateFigurineWithModelUrl(currentFigurineId, data.modelUrl);
+          try {
+            // First save the external model URL temporarily
+            setModelUrl(data.modelUrl);
+            setIsConverting(false);
+            setConversionProgress(100);
+            setConversionError(null);
+            
+            // Attempt to download and save the model to our storage
+            if (currentFigurineId) {
+              // Start downloading and saving the model asynchronously
+              toast({
+                title: "3D model created",
+                description: "Downloading and saving your 3D model...",
+              });
+              
+              // Download and save the model to our storage
+              const storedModelUrl = await downloadAndSaveModel(
+                data.modelUrl, 
+                `figurine_${currentFigurineId}`
+              );
+              
+              if (storedModelUrl) {
+                // Update the model URL to our stored version
+                setModelUrl(storedModelUrl);
+                
+                // Update figurine with the stored model URL
+                await updateFigurineWithModelUrl(currentFigurineId, storedModelUrl);
+                
+                toast({
+                  title: "3D model saved",
+                  description: "Your figurine is ready to view in 3D",
+                });
+              } else {
+                // Fallback to the external URL if storage failed
+                await updateFigurineWithModelUrl(currentFigurineId, data.modelUrl);
+                
+                toast({
+                  title: "3D model created",
+                  description: "Your figurine is ready to view in 3D (using external hosting)",
+                });
+              }
+            }
+          } catch (saveError) {
+            console.error("Error saving model:", saveError);
+            
+            // If we failed to save the model, still update with the external URL
+            if (currentFigurineId) {
+              await updateFigurineWithModelUrl(currentFigurineId, data.modelUrl);
+            }
           }
           
           // Close the connection as we're done
