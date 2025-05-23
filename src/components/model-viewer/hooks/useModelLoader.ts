@@ -4,14 +4,21 @@ import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
 import { loadModelWithFallback, createObjectUrl, revokeObjectUrl } from "../utils/modelLoaderUtils";
 import { cleanupResources } from "../utils/resourceManager";
+import { modelQueueManager } from "../utils/modelQueueManager";
 
 interface UseModelLoaderProps {
   modelSource: string | null;
   modelBlob?: Blob | null;
   onError: (error: any) => void;
+  modelId?: string;
 }
 
-export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoaderProps) => {
+export const useModelLoader = ({ 
+  modelSource, 
+  modelBlob, 
+  onError,
+  modelId: providedModelId 
+}: UseModelLoaderProps) => {
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<THREE.Group | null>(null);
   const { toast } = useToast();
@@ -20,39 +27,50 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
   const isLoadingRef = useRef<boolean>(false);
   const controllerRef = useRef<AbortController | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const modelIdRef = useRef<string>(
+    providedModelId || `modelloader-${Math.random().toString(36).substring(2, 10)}`
+  );
   
-  // Add refs to track last loaded blob/URL to prevent infinite loops
-  const lastBlobRef = useRef<Blob | null>(null);
-  const lastUrlRef = useRef<string | null>(null);
+  // Add refs to track current source to prevent infinite loops
+  const currentSourceRef = useRef<string | Blob | null>(null);
 
   useEffect(() => {
-    console.log("useModelLoader: Effect triggered with source:", 
-      typeof modelSource === 'string' ? modelSource : 'Blob object');
+    console.log(`useModelLoader: Effect triggered for ${modelIdRef.current}`);
     
     // Skip effect if no source provided
     if (!modelSource && !modelBlob) {
-      console.log("No model source provided, skipping load");
+      console.log(`No model source provided for ${modelIdRef.current}, skipping load`);
+      setLoading(false);
       return;
     }
     
     // Check if the same source is being loaded again to prevent infinite loops
-    const isRepeatedBlob = modelBlob && lastBlobRef.current && modelBlob === lastBlobRef.current;
-    const isRepeatedUrl = modelSource && lastUrlRef.current && modelSource === lastUrlRef.current;
-    
-    if (isRepeatedBlob || isRepeatedUrl) {
-      console.log("Same model source detected, skipping reload");
+    const newSource = modelBlob || modelSource;
+    if (newSource === currentSourceRef.current && model) {
+      console.log(`Same model source detected for ${modelIdRef.current}, skipping reload`);
       return;
     }
     
-    // Update last loaded sources
-    if (modelBlob) lastBlobRef.current = modelBlob;
-    if (modelSource) lastUrlRef.current = modelSource;
+    // Update current source reference
+    currentSourceRef.current = newSource;
     
-    // Create new abort controller for this load operation
+    // Abort previous load if in progress
     if (controllerRef.current) {
-      console.log("Aborting previous load operation");
+      console.log(`Aborting previous load operation for ${modelIdRef.current}`);
       controllerRef.current.abort();
+      
+      // Also abort any queued load
+      modelQueueManager.abortModelLoad(modelIdRef.current);
     }
+    
+    // Clean up previous model resources
+    if (model) {
+      console.log(`Cleaning up previous model resources for ${modelIdRef.current}`);
+      cleanupResources(model, objectUrlRef.current, controllerRef.current);
+      setModel(null);
+    }
+    
+    // Create a new abort controller for this load operation
     controllerRef.current = new AbortController();
     
     // Set loading state
@@ -62,7 +80,6 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
     const loadModel = async () => {
       try {
         let modelUrl: string;
-        let shouldRevokeUrl = false;
         
         // Handle different source types
         if (modelBlob) {
@@ -74,48 +91,43 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
           
           objectUrlRef.current = createObjectUrl(modelBlob);
           modelUrl = objectUrlRef.current;
-          shouldRevokeUrl = true;
-          console.log("Created and loading from blob object URL:", modelUrl);
+          console.log(`Created object URL for ${modelIdRef.current}: ${modelUrl}`);
         } else if (typeof modelSource === 'string') {
           // It's a URL string
           modelUrl = modelSource;
-          console.log("Loading from URL string:", modelUrl);
+          console.log(`Loading from URL string for ${modelIdRef.current}: ${modelUrl}`);
         } else {
-          console.log("Invalid model source");
+          console.log(`Invalid model source for ${modelIdRef.current}`);
           setLoading(false);
           isLoadingRef.current = false;
           return;
         }
         
-        try {
-          // Load the model with fallback strategy
-          const scene = await loadModelWithFallback(modelUrl, {
+        // Queue the model load
+        const loadedModel = await modelQueueManager.queueModelLoad(
+          modelIdRef.current,
+          () => loadModelWithFallback(modelUrl, {
             signal: controllerRef.current?.signal
-          });
-          
-          setModel(scene);
-          setLoading(false);
-          isLoadingRef.current = false;
-          toast({
-            title: "Model loaded",
-            description: "3D model loaded successfully",
-          });
-        } catch (error) {
-          if (controllerRef.current?.signal.aborted) return;
-          
-          console.error("Failed to load model:", error);
-          onError(error);
-          setLoading(false);
-          isLoadingRef.current = false;
-          toast({
-            title: "Loading failed",
-            description: "Failed to load the 3D model. Please try downloading it instead.",
-            variant: "destructive",
-          });
+          })
+        );
+        
+        if (controllerRef.current?.signal.aborted) {
+          console.log(`Load operation was aborted for ${modelIdRef.current}`);
+          return;
         }
+        
+        setModel(loadedModel);
+        setLoading(false);
+        isLoadingRef.current = false;
+        console.log(`Model ${modelIdRef.current} loaded successfully`);
+        
       } catch (error) {
-        if (controllerRef.current?.signal.aborted) return;
-        console.error("Unexpected error in model loading:", error);
+        if (controllerRef.current?.signal.aborted) {
+          console.log(`Error ignored due to abort for ${modelIdRef.current}`);
+          return;
+        }
+        
+        console.error(`Failed to load model ${modelIdRef.current}:`, error);
         onError(error);
         setLoading(false);
         isLoadingRef.current = false;
@@ -126,13 +138,26 @@ export const useModelLoader = ({ modelSource, modelBlob, onError }: UseModelLoad
     
     // Cleanup function
     return () => {
-      console.log("Cleanup: Disposing model resources");
-      cleanupResources(model, objectUrlRef.current, controllerRef.current);
-      isLoadingRef.current = false;
-      objectUrlRef.current = null;
-      controllerRef.current = null;
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+      
+      // Don't dispose the model here - let the component using it handle disposal
+      // Just clean up the controller and URL
+      if (objectUrlRef.current && modelBlob) {
+        revokeObjectUrl(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
     };
-  }, [modelSource, modelBlob, onError, toast, model]);
+  }, [modelSource, modelBlob, onError]);
+  
+  // Clean up all resources when unmounting
+  useEffect(() => {
+    return () => {
+      cleanupResources(model, objectUrlRef.current, controllerRef.current);
+      console.log(`Cleaned up resources on unmount for ${modelIdRef.current}`);
+    };
+  }, []);
   
   return { loading, model };
 };

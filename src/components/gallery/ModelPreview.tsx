@@ -1,5 +1,5 @@
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useState, useRef, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Environment } from "@react-three/drei";
 import { ErrorBoundary } from "@/components/model-viewer/ErrorBoundary";
@@ -15,10 +15,20 @@ interface ModelPreviewProps {
 }
 
 // This component will render the actual 3D model
-const ModelContent = ({ modelUrl, isVisible }: { modelUrl: string; isVisible: boolean }) => {
+const ModelContent = ({ 
+  modelUrl, 
+  isVisible 
+}: { 
+  modelUrl: string; 
+  isVisible: boolean 
+}) => {
+  // Create a stable ID based on the URL to prevent reloads
+  const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.replace(/\.\w+$/, '')}`);
+  
   const { loading, model, error } = useOptimizedModelLoader({ 
     modelSource: modelUrl, 
     visible: isVisible,
+    modelId: modelIdRef.current,
     onError: (err) => console.error(`Error loading model ${modelUrl}:`, err)
   });
   
@@ -38,10 +48,11 @@ const ModelContent = ({ modelUrl, isVisible }: { modelUrl: string; isVisible: bo
 const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   const [hasError, setHasError] = useState(false);
   const { targetRef, isIntersecting, wasEverVisible } = useIntersectionObserver({
-    rootMargin: '200px', // Load when within 200px of viewport
-    threshold: 0.1
+    rootMargin: '300px', // Increased margin to load earlier
+    threshold: 0.1,
+    once: true // Only observe once, then disconnect to prevent re-intersection triggers
   });
-
+  
   // Handle errors silently by showing the placeholder
   const handleError = (error: any) => {
     console.error(`ModelPreview error for ${fileName}:`, error);
@@ -52,11 +63,16 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
     return <ModelPlaceholder fileName={fileName} />;
   }
 
+  // Create unique ID for this preview canvas to avoid conflicts
+  const canvasId = useRef(`canvas-${fileName.replace(/\W/g, '')}-${Math.random().toString(36).substring(2, 10)}`);
+
   return (
     <div className="w-full h-full" ref={targetRef as React.RefObject<HTMLDivElement>}>
       {(isIntersecting || wasEverVisible) ? (
         <ErrorBoundary fallback={<ModelPlaceholder fileName={fileName} />} onError={handleError}>
-          <Canvas shadows 
+          <Canvas 
+            id={canvasId.current}
+            shadows 
             gl={{ 
               powerPreference: "default",
               antialias: false, // Disable for performance
@@ -72,7 +88,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
             
             <Suspense fallback={<LoadingSpinner />}>
-              <ModelContent modelUrl={modelUrl} isVisible={isIntersecting} />
+              <ModelContent modelUrl={modelUrl} isVisible={isIntersecting || wasEverVisible} />
             </Suspense>
             
             <OrbitControls 

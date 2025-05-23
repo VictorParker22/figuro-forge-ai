@@ -23,9 +23,25 @@ export const useModelViewer = () => {
     return () => {
       // Reset active viewers count when component unmounts
       activeViewersRef.current = 0;
+      
+      // Reset queue manager to clean up resources
       modelQueueManager.reset();
     };
   }, []);
+
+  // Handle closing model viewer and cleaning up resources
+  const handleCloseModelViewer = () => {
+    setModelViewerOpen(false);
+    setViewingModel(null); // Clear the model URL to prevent reloading
+    
+    activeViewersRef.current = Math.max(0, activeViewersRef.current - 1);
+    webGLContextTracker.releaseContext();
+    
+    // Allow a short timeout for cleanup before allowing another open
+    setTimeout(() => {
+      console.log("Model viewer resources released");
+    }, 300);
+  };
 
   // Handle opening full model viewer
   const handleViewModel = (modelUrl: string) => {
@@ -48,17 +64,23 @@ export const useModelViewer = () => {
       });
     }
     
-    setViewingModel(modelUrl);
-    setModelViewerOpen(true);
-    activeViewersRef.current += 1;
-    webGLContextTracker.registerContext();
-  };
-  
-  // Handle closing model viewer and cleaning up resources
-  const handleCloseModelViewer = () => {
-    setModelViewerOpen(false);
-    activeViewersRef.current = Math.max(0, activeViewersRef.current - 1);
-    webGLContextTracker.releaseContext();
+    // First close any existing viewer to clean up resources
+    if (modelViewerOpen) {
+      handleCloseModelViewer();
+      
+      // Short timeout to ensure cleanup before opening new model
+      setTimeout(() => {
+        setViewingModel(modelUrl);
+        setModelViewerOpen(true);
+        activeViewersRef.current += 1;
+        webGLContextTracker.registerContext();
+      }, 300);
+    } else {
+      setViewingModel(modelUrl);
+      setModelViewerOpen(true);
+      activeViewersRef.current += 1;
+      webGLContextTracker.registerContext();
+    }
   };
   
   return {

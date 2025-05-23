@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import ModelViewer from "@/components/model-viewer";
@@ -25,8 +25,36 @@ const ModelViewerDialog: React.FC<ModelViewerDialogProps> = ({
   modelUrl,
   onClose
 }) => {
+  // Use a stable URL reference to prevent reloading when dialog reopens
+  const [stableModelUrl, setStableModelUrl] = React.useState<string | null>(null);
+  
+  useEffect(() => {
+    // Only update the URL if it changes significantly
+    if (modelUrl && modelUrl !== stableModelUrl) {
+      // Small delay to ensure stable updates
+      const timer = setTimeout(() => {
+        setStableModelUrl(modelUrl);
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // Reset URL when dialog closes
+    if (!open) {
+      setStableModelUrl(null);
+    }
+  }, [modelUrl, open, stableModelUrl]);
+  
+  // Handle dialog close properly with cleanup
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      onClose();
+    }
+    onOpenChange(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[800px] p-0 bg-gray-900/90 border border-white/10">
         <DialogHeader className="p-4 border-b border-white/10">
           <DialogTitle className="flex justify-between items-center">
@@ -38,9 +66,9 @@ const ModelViewerDialog: React.FC<ModelViewerDialogProps> = ({
             </DialogClose>
           </DialogTitle>
         </DialogHeader>
-        {modelUrl && (
+        {open && stableModelUrl && (
           <ModelViewer 
-            modelUrl={modelUrl}
+            modelUrl={stableModelUrl}
             isLoading={false}
           />
         )}

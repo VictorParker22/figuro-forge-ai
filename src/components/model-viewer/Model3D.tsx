@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useRef } from "react";
 import { Center } from "@react-three/drei";
 import LoadingSpinner from "./LoadingSpinner";
 import { useModelLoader } from "./hooks/useModelLoader";
@@ -11,9 +11,13 @@ interface Model3DProps {
 }
 
 const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
+  // Create a stable ID for this model
+  const modelIdRef = useRef<string>(`model3d-${Math.random().toString(36).substring(2, 10)}`);
+  
   const { loading, model } = useModelLoader({ 
     modelSource, 
-    modelBlob, 
+    modelBlob,
+    modelId: modelIdRef.current,
     onError 
   });
   

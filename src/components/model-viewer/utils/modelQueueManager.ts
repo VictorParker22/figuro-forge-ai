@@ -8,6 +8,7 @@ class ModelQueueManager {
   private maxConcurrent = 2; // Maximum number of models loading at once
   private queue: Array<() => Promise<unknown>> = [];
   private activeLoaders = new Set<string>();
+  private abortControllers = new Map<string, AbortController>();
 
   private constructor() {}
 
@@ -33,6 +34,22 @@ class ModelQueueManager {
   }
 
   /**
+   * Abort a specific model load
+   */
+  public abortModelLoad(modelId: string): void {
+    if (this.abortControllers.has(modelId)) {
+      try {
+        console.log(`[Queue] Aborting model load: ${modelId}`);
+        this.abortControllers.get(modelId)?.abort();
+        this.abortControllers.delete(modelId);
+        this.activeLoaders.delete(modelId);
+      } catch (error) {
+        console.error(`Error aborting model load for ${modelId}:`, error);
+      }
+    }
+  }
+
+  /**
    * Queue a model to be loaded
    */
   public async queueModelLoad<T>(
@@ -53,6 +70,10 @@ class ModelQueueManager {
           return;
         }
 
+        // Create a new abort controller for this load
+        const controller = new AbortController();
+        this.abortControllers.set(modelId, controller);
+
         try {
           this.loadingCount++;
           this.activeLoaders.add(modelId);
@@ -67,6 +88,7 @@ class ModelQueueManager {
         } finally {
           this.loadingCount--;
           this.activeLoaders.delete(modelId);
+          this.abortControllers.delete(modelId);
           this.processQueue();
         }
       };
@@ -96,9 +118,20 @@ class ModelQueueManager {
    * Clear the queue and reset loading state
    */
   public reset(): void {
+    // Abort all in-progress loads
+    this.abortControllers.forEach((controller, modelId) => {
+      try {
+        console.log(`[Queue] Aborting model load during reset: ${modelId}`);
+        controller.abort();
+      } catch (error) {
+        console.error(`Error aborting model load for ${modelId}:`, error);
+      }
+    });
+    
     this.queue = [];
     this.loadingCount = 0;
     this.activeLoaders.clear();
+    this.abortControllers.clear();
   }
 }
 

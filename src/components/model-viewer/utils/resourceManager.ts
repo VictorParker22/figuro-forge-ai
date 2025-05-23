@@ -60,6 +60,7 @@ class WebGLContextTracker {
   private static instance: WebGLContextTracker;
   private contextCount = 0;
   private readonly MAX_CONTEXTS = 8; // Most browsers limit to 8-16 concurrent contexts
+  private disposalTimeouts: number[] = [];
   
   private constructor() {}
   
@@ -71,17 +72,34 @@ class WebGLContextTracker {
   }
   
   public registerContext(): number {
+    // Clear any pending disposal timeouts
+    this.clearDisposalTimeouts();
+    
     this.contextCount++;
     console.log(`WebGL context created. Active contexts: ${this.contextCount}/${this.MAX_CONTEXTS}`);
     return this.contextCount;
   }
   
   public releaseContext(): number {
-    if (this.contextCount > 0) {
-      this.contextCount--;
-    }
-    console.log(`WebGL context released. Active contexts: ${this.contextCount}/${this.MAX_CONTEXTS}`);
+    // Use a timeout to help with disposal
+    const timeoutId = window.setTimeout(() => {
+      if (this.contextCount > 0) {
+        this.contextCount--;
+      }
+      console.log(`WebGL context released. Active contexts: ${this.contextCount}/${this.MAX_CONTEXTS}`);
+      
+      // Remove this timeout from the array
+      this.disposalTimeouts = this.disposalTimeouts.filter(id => id !== timeoutId);
+    }, 500) as unknown as number;
+    
+    this.disposalTimeouts.push(timeoutId);
+    
     return this.contextCount;
+  }
+  
+  private clearDisposalTimeouts(): void {
+    this.disposalTimeouts.forEach(id => window.clearTimeout(id));
+    this.disposalTimeouts = [];
   }
   
   public isNearingLimit(): boolean {
@@ -90,6 +108,12 @@ class WebGLContextTracker {
   
   public getActiveContextCount(): number {
     return this.contextCount;
+  }
+  
+  public reset(): void {
+    this.clearDisposalTimeouts();
+    this.contextCount = 0;
+    console.log("WebGL context tracker reset");
   }
 }
 
