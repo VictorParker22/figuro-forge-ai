@@ -48,7 +48,7 @@ export const useIntersectionObserver = (
       threshold: options.threshold || 0
     });
 
-    observer.observe(target);
+    observerRef.current.observe(target);
 
     return () => {
       if (observerRef.current) {
