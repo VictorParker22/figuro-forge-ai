@@ -1,7 +1,6 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Eye, Cube } from "lucide-react";
+import { Download, Eye, Box } from "lucide-react";
 import ModelPlaceholder from "./ModelPlaceholder";
 import ModelPreview from "./ModelPreview";
 
@@ -85,7 +84,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
               <ModelPlaceholder fileName={file.name} />
             )}
             <div className="absolute top-2 right-2 bg-figuro-accent/80 rounded-full p-1.5">
-              <Cube size={16} />
+              <Box size={16} />
             </div>
           </div>
         )}
