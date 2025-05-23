@@ -1,117 +1,122 @@
-
-import React, { useEffect, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import * as THREE from 'three';
-import ModelPlaceholder from './ModelPlaceholder';
+import React, { Suspense, useState, useEffect, useRef, useMemo } from "react";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, PerspectiveCamera, Environment } from "@react-three/drei";
+import { ErrorBoundary } from "@/components/model-viewer/ErrorBoundary";
+import DummyBox from "@/components/model-viewer/DummyBox";
+import LoadingSpinner from "@/components/model-viewer/LoadingSpinner";
+import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
+import { useOptimizedModelLoader } from "@/components/model-viewer/hooks/useOptimizedModelLoader";
+import ModelPlaceholder from "./ModelPlaceholder";
 
 interface ModelPreviewProps {
   modelUrl: string;
   fileName: string;
-  onError?: () => void;
 }
 
-const LoadingSpinner = () => {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-figuro-accent border-t-transparent rounded-full animate-spin"></div>
-    </div>
-  );
-};
-
-const Model = ({ url, onError }: { url: string; onError?: () => void }) => {
-  const [model, setModel] = useState<THREE.Group | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+// This component will render the actual 3D model
+const ModelContent = ({ 
+  modelUrl, 
+  isVisible 
+}: { 
+  modelUrl: string; 
+  isVisible: boolean 
+}) => {
+  // Create a stable ID based on the URL to prevent reloads
+  const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}`);
   
-  useEffect(() => {
-    const loader = new GLTFLoader();
-    
-    loader.load(
-      url,
-      (gltf) => {
-        setModel(gltf.scene);
-        setIsLoading(false);
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading model:', error);
-        if (onError) onError();
-        setIsLoading(false);
-      }
-    );
-    
-    return () => {
-      if (model) {
-        model.traverse((child: any) => {
-          if (child.isMesh) {
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) {
-              if (Array.isArray(child.material)) {
-                child.material.forEach((material: any) => material.dispose());
-              } else {
-                child.material.dispose();
-              }
-            }
-          }
-        });
-      }
-    };
-  }, [url, onError]);
+  console.log(`ModelContent: Loading ${modelUrl}, visible: ${isVisible}, id: ${modelIdRef.current}`);
   
-  if (isLoading) return null;
+  const { loading, model, error } = useOptimizedModelLoader({ 
+    modelSource: modelUrl, 
+    visible: isVisible,
+    modelId: modelIdRef.current,
+    onError: (err) => console.error(`Error loading model ${modelUrl}:`, err)
+  });
   
-  if (!model) return null;
+  if (loading) {
+    return <LoadingSpinner />;
+  }
   
-  return (
-    <primitive 
-      object={model} 
-      scale={[1.5, 1.5, 1.5]}
-      position={[0, 0, 0]}
-    />
-  );
-};
-
-const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName, onError }) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const timerRef = useRef<number | null>(null);
-  
-  const handleError = () => {
-    setError(true);
-    if (onError) onError();
-  };
-  
-  useEffect(() => {
-    // Set a loading timeout
-    timerRef.current = window.setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-    
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-  
-  if (error) {
-    return <ModelPlaceholder fileName={fileName} />;
+  if (error || !model) {
+    console.error(`Failed to load model: ${modelUrl}`, error);
+    return <DummyBox />;
   }
   
   return (
-    <div className="relative w-full h-full">
-      {loading && <LoadingSpinner />}
-      <Canvas>
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
-        <PerspectiveCamera makeDefault position={[0, 0, 5]} />
-        <Model url={modelUrl} onError={handleError} />
-        <OrbitControls 
-          enablePan={false} 
-          enableZoom={false} 
-          autoRotate 
-          autoRotateSpeed={3} 
-        />
-      </Canvas>
+    <primitive object={model} scale={1.5} />
+  );
+};
+
+const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
+  const [hasError, setHasError] = useState(false);
+  const { targetRef, isIntersecting, wasEverVisible } = useIntersectionObserver({
+    rootMargin: '300px', // Increased margin to load earlier
+    threshold: 0.1,
+    once: true // Only observe once, then disconnect to prevent re-intersection triggers
+  });
+  
+  // Clean URL from query params for better caching
+  const cleanModelUrl = useMemo(() => {
+    const url = new URL(modelUrl);
+    // Keep only necessary query parameters if any
+    return url.toString();
+  }, [modelUrl]);
+  
+  // Handle errors silently by showing the placeholder
+  const handleError = (error: any) => {
+    console.error(`ModelPreview error for ${fileName}:`, error);
+    setHasError(true);
+  };
+
+  useEffect(() => {
+    console.log(`ModelPreview ${fileName}: ${isIntersecting ? 'visible' : 'not visible'}, ever visible: ${wasEverVisible}`);
+  }, [isIntersecting, wasEverVisible, fileName]);
+
+  if (hasError) {
+    return <ModelPlaceholder fileName={fileName} />;
+  }
+
+  // Create unique ID for this preview canvas to avoid conflicts
+  const canvasId = useRef(`canvas-${fileName.replace(/\W/g, '')}-${Math.random().toString(36).substring(2, 10)}`);
+
+  return (
+    <div className="w-full h-full" ref={targetRef as React.RefObject<HTMLDivElement>}>
+      {(isIntersecting || wasEverVisible) ? (
+        <ErrorBoundary fallback={<ModelPlaceholder fileName={fileName} />} onError={handleError}>
+          <Canvas 
+            id={canvasId.current}
+            shadows 
+            gl={{ 
+              powerPreference: "default",
+              antialias: false, // Disable for performance
+              depth: true,
+              stencil: false,
+              alpha: true
+            }}
+            dpr={[1, 1.5]} // Limit resolution for performance
+          >
+            <color attach="background" args={['#1a1a1a']} />
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[10, 10, 5]} intensity={1} />
+            <PerspectiveCamera makeDefault position={[0, 0, 5]} />
+            
+            <Suspense fallback={<LoadingSpinner />}>
+              <ModelContent modelUrl={cleanModelUrl} isVisible={isIntersecting || wasEverVisible} />
+            </Suspense>
+            
+            <OrbitControls 
+              autoRotate={true}
+              autoRotateSpeed={4}
+              enablePan={false}
+              enableZoom={false}
+              enableRotate={true}
+            />
+            <Environment preset="sunset" />
+          </Canvas>
+        </ErrorBoundary>
+      ) : (
+        <ModelPlaceholder fileName={fileName} />
+      )}
     </div>
   );
 };
