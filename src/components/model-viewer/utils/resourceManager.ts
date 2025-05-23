@@ -1,121 +1,120 @@
 
 import * as THREE from "three";
-
-// Maximum number of WebGL contexts that browsers typically support
-const MAX_WEBGL_CONTEXTS = 16;
+import { disposeModel } from "./modelUtils";
 
 /**
- * Simple tracker for WebGL contexts to help prevent creating too many
- */
-export const webGLContextTracker = {
-  activeContexts: 0,
-  
-  // Register a new context
-  registerContext() {
-    this.activeContexts += 1;
-    console.log(`[WebGLContextTracker] Registered context, total: ${this.activeContexts}`);
-  },
-  
-  // Release a context
-  releaseContext() {
-    this.activeContexts = Math.max(0, this.activeContexts - 1);
-    console.log(`[WebGLContextTracker] Released context, remaining: ${this.activeContexts}`);
-  },
-  
-  // Check if we're nearing the limit of WebGL contexts
-  isNearingLimit() {
-    return this.activeContexts >= MAX_WEBGL_CONTEXTS * 0.75; // Warning at 75% of max
-  }
-};
-
-/**
- * Recursively dispose of Three.js resources to prevent memory leaks
- * @param object The object to dispose
- * @returns void
- */
-export const disposeObject = (object: THREE.Object3D): void => {
-  if (!object) return;
-  
-  // Traverse the children
-  object.traverse((child: THREE.Object3D) => {
-    // Handle meshes
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
-      
-      // Dispose geometry
-      if (mesh.geometry) {
-        mesh.geometry.dispose();
-      }
-      
-      // Dispose material(s)
-      if (mesh.material) {
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach(material => {
-            disposeMaterial(material);
-          });
-        } else {
-          disposeMaterial(mesh.material);
-        }
-      }
-    }
-  });
-  
-  // Remove from parent if it exists
-  if (object.parent) {
-    object.parent.remove(object);
-  }
-  
-  console.log("[resourceManager] Disposed of object and its resources");
-};
-
-/**
- * Dispose of a Three.js material and its textures
- * @param material The material to dispose
- */
-export const disposeMaterial = (material: THREE.Material): void => {
-  if (!material) return;
-  
-  // Dispose textures
-  for (const key in material) {
-    const value = (material as any)[key];
-    if (value && value.isTexture) {
-      value.dispose();
-    }
-  }
-  
-  // Dispose material
-  material.dispose();
-};
-
-/**
- * Clean up all resources associated with a model
+ * Clean up resources to prevent memory leaks
  * @param model The model to clean up
- * @param objectUrl Optional object URL to revoke
- * @param controller Optional abort controller to abort
+ * @param objectUrl The object URL to revoke
+ * @param abortController The abort controller to abort
  */
 export const cleanupResources = (
   model: THREE.Group | null,
-  objectUrl?: string | null,
-  controller?: AbortController | null
+  objectUrl: string | null,
+  abortController: AbortController | null
 ): void => {
-  // Abort any in-progress operations
-  if (controller) {
-    controller.abort();
-    console.log("[resourceManager] Aborted in-progress operations");
-  }
-  
-  // Revoke object URL if it exists
-  if (objectUrl && objectUrl.startsWith('blob:')) {
+  // Abort any in-progress loads
+  if (abortController) {
     try {
-      URL.revokeObjectURL(objectUrl);
-      console.log("[resourceManager] Revoked object URL:", objectUrl);
+      abortController.abort();
+      console.log("Aborted in-progress model load");
     } catch (error) {
-      console.error("[resourceManager] Error revoking object URL:", error);
+      console.error("Error aborting model load:", error);
     }
   }
   
-  // Dispose object if it exists
+  // Dispose the model
   if (model) {
-    disposeObject(model);
+    try {
+      console.log("Disposing model resources");
+      disposeModel(model);
+    } catch (error) {
+      console.error("Error disposing model:", error);
+    }
+  }
+  
+  // Revoke object URL if we created one
+  if (objectUrl && objectUrl.startsWith('blob:')) {
+    try {
+      URL.revokeObjectURL(objectUrl);
+      console.log("Revoked object URL:", objectUrl);
+    } catch (error) {
+      console.error("Error revoking object URL:", error);
+    }
+  }
+  
+  // Force garbage collection hint (not guaranteed to work)
+  if (window.gc) {
+    try {
+      window.gc();
+    } catch (e) {
+      console.log("Manual GC not available");
+    }
   }
 };
+
+/**
+ * Track WebGL context usage across the application
+ */
+class WebGLContextTracker {
+  private static instance: WebGLContextTracker;
+  private contextCount = 0;
+  private readonly MAX_CONTEXTS = 8; // Most browsers limit to 8-16 concurrent contexts
+  private disposalTimeouts: number[] = [];
+  
+  private constructor() {}
+  
+  public static getInstance(): WebGLContextTracker {
+    if (!WebGLContextTracker.instance) {
+      WebGLContextTracker.instance = new WebGLContextTracker();
+    }
+    return WebGLContextTracker.instance;
+  }
+  
+  public registerContext(): number {
+    // Clear any pending disposal timeouts
+    this.clearDisposalTimeouts();
+    
+    this.contextCount++;
+    console.log(`WebGL context created. Active contexts: ${this.contextCount}/${this.MAX_CONTEXTS}`);
+    return this.contextCount;
+  }
+  
+  public releaseContext(): number {
+    // Use a timeout to help with disposal
+    const timeoutId = window.setTimeout(() => {
+      if (this.contextCount > 0) {
+        this.contextCount--;
+      }
+      console.log(`WebGL context released. Active contexts: ${this.contextCount}/${this.MAX_CONTEXTS}`);
+      
+      // Remove this timeout from the array
+      this.disposalTimeouts = this.disposalTimeouts.filter(id => id !== timeoutId);
+    }, 500) as unknown as number;
+    
+    this.disposalTimeouts.push(timeoutId);
+    
+    return this.contextCount;
+  }
+  
+  private clearDisposalTimeouts(): void {
+    this.disposalTimeouts.forEach(id => window.clearTimeout(id));
+    this.disposalTimeouts = [];
+  }
+  
+  public isNearingLimit(): boolean {
+    return this.contextCount > (this.MAX_CONTEXTS * 0.7); // 70% of max
+  }
+  
+  public getActiveContextCount(): number {
+    return this.contextCount;
+  }
+  
+  public reset(): void {
+    this.clearDisposalTimeouts();
+    this.contextCount = 0;
+    console.log("WebGL context tracker reset");
+  }
+}
+
+export const webGLContextTracker = WebGLContextTracker.getInstance();
