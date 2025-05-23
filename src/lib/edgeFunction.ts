@@ -4,6 +4,8 @@
  * using the Hugging Face API with optimization for edge computing
  */
 
+import { addCorsProxy } from "@/utils/corsProxy";
+
 type ImageGenerationOptions = {
   prompt: string;
   style: string;
@@ -43,8 +45,12 @@ export const generateImageWithEdge = async (
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
     
-    // Make the API request with edge optimization
-    const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev", {
+    // Add CORS proxy to the API endpoint
+    const apiEndpoint = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev";
+    const proxiedEndpoint = addCorsProxy(apiEndpoint);
+    
+    // Make the API request with edge optimization and CORS proxy
+    const response = await fetch(proxiedEndpoint, {
       method: "POST",
       headers,
       body: JSON.stringify({ 

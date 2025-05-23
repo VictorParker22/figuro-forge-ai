@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -121,11 +122,31 @@ const Studio = () => {
       return;
     }
     
-    // Call the handleGenerate function directly
-    const result = await handleGenerate(prompt, style, apiKey);
-    
-    if (result.needsApiKey) {
-      setShowApiInput(true);
+    // Call the handleGenerate function with improved error handling
+    try {
+      const result = await handleGenerate(prompt, style, apiKey);
+      
+      if (result.needsApiKey) {
+        setShowApiInput(true);
+        toast({
+          title: "API Key Required",
+          description: "Please enter your Hugging Face API key to continue",
+        });
+      } else if (!result.success) {
+        // If there was an error but not related to API key
+        toast({
+          title: "Generation Failed",
+          description: result.error || "Failed to generate image. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error in image generation:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
     }
   };
   
@@ -229,7 +250,10 @@ const Studio = () => {
           {showApiInput && (
             <ApiKeyInput 
               apiKey={apiKey}
-              setApiKey={setApiKey}
+              setApiKey={(key) => {
+                setApiKey(key);
+                localStorage.setItem("tempHuggingFaceApiKey", key);
+              }}
               onSubmit={() => setShowApiInput(false)}
             />
           )}
@@ -246,7 +270,7 @@ const Studio = () => {
               <ImagePreview 
                 imageSrc={generatedImage} 
                 isLoading={isGeneratingImage}
-                onConvertTo3D={handleConvertWithUsageTracking} // Use the new function here
+                onConvertTo3D={handleConvertWithUsageTracking}
                 isConverting={isConverting}
                 generationMethod={generationMethod}
               />

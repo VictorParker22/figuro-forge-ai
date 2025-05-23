@@ -1,6 +1,8 @@
+
 import { formatStylePrompt } from "@/lib/huggingface";
-import { SUPABASE_PUBLISHABLE_KEY, supabase } from "@/integrations/supabase/client";
+import { SUPABASE_PUBLISHABLE_KEY, supabase, SUPABASE_URL } from "@/integrations/supabase/client";
 import { generateImageWithEdge } from "@/lib/edgeFunction";
+import { addCorsProxy } from "@/utils/corsProxy";
 
 // Track if the edge function is available
 let isEdgeFunctionAvailable: boolean | null = null;
@@ -38,8 +40,8 @@ export const generateImage = async (prompt: string, style: string, apiKey: strin
       console.log("Attempting image generation using Edge Function...");
       
       try {
-        // Try the edge function
-        const response = await fetch(`${window.location.origin}/functions/v1/generate-image`, {
+        // Try the edge function - Use the correct Supabase URL instead of window.location.origin
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-image`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
