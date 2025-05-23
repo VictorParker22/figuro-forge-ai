@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { toast } from "@/hooks/use-toast";
+import { cleanupAuthState, getAuthErrorMessage } from "@/utils/authUtils";
 
 interface AuthContextType {
   user: User | null;
@@ -13,6 +14,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: any, data: any }>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,7 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_, session) => {
+      (event, session) => {
+        console.log("Auth state changed:", event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -43,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Initial session check:", session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -77,30 +81,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      // Clean up existing auth state before attempting sign in
+      cleanupAuthState();
+      
+      // Attempt global sign out to ensure clean state
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (err) {
+        // Continue even if this fails
+        console.log("Pre-signIn global sign out error (non-critical):", err);
+      }
+      
+      // Attempt to sign in
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
+        const friendlyError = getAuthErrorMessage(error);
         toast({
           title: "Error signing in",
-          description: error.message,
+          description: friendlyError,
           variant: "destructive",
         });
-        return { error };
+        return { error: friendlyError };
+      }
+      
+      // Force page reload to ensure clean state
+      if (data.user) {
+        // Optional: You can force a page reload here if needed
+        // window.location.href = '/';
       }
       
       return { error: null };
     } catch (error: any) {
+      const friendlyError = getAuthErrorMessage(error);
       toast({
         title: "Error signing in",
-        description: error.message,
+        description: friendlyError,
         variant: "destructive",
       });
-      return { error };
+      return { error: friendlyError };
     }
   };
 
   const signUp = async (email: string, password: string) => {
     try {
+      // Clean up existing auth state first
+      cleanupAuthState();
+      
+      // Attempt global sign out to ensure clean state
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (err) {
+        // Continue even if this fails
+        console.log("Pre-signUp global sign out error (non-critical):", err);
+      }
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -111,39 +146,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (error) {
+        const friendlyError = getAuthErrorMessage(error);
         toast({
           title: "Error signing up",
-          description: error.message,
+          description: friendlyError,
           variant: "destructive",
         });
+        return { error: friendlyError, data: null };
       } else {
+        const isEmailVerificationRequired = !data.session;
+        
         toast({
-          title: "Signup successful",
-          description: "Please check your email to confirm your account.",
+          title: isEmailVerificationRequired ? "Verification email sent" : "Signup successful",
+          description: isEmailVerificationRequired 
+            ? "Please check your email to confirm your account before signing in."
+            : "Your account has been created successfully.",
         });
       }
       
-      return { error, data };
+      return { error: null, data };
     } catch (error: any) {
+      const friendlyError = getAuthErrorMessage(error);
       toast({
         title: "Error signing up",
-        description: error.message,
+        description: friendlyError,
         variant: "destructive",
       });
-      return { error, data: null };
+      return { error: friendlyError, data: null };
     }
   };
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      // Clean up auth state first
+      cleanupAuthState();
+      
+      // Attempt global sign out
+      await supabase.auth.signOut({ scope: 'global' });
+      
+      // Force page reload to ensure clean state
+      window.location.href = '/auth';
+      
       toast({
         title: "Signed out successfully",
       });
     } catch (error: any) {
+      const friendlyError = getAuthErrorMessage(error);
       toast({
         title: "Error signing out",
-        description: error.message,
+        description: friendlyError,
         variant: "destructive",
       });
     }
@@ -151,6 +202,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
+      // Clean up existing auth state first
+      cleanupAuthState();
+      
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -158,11 +212,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
     } catch (error: any) {
+      const friendlyError = getAuthErrorMessage(error);
       toast({
         title: "Error signing in with Google",
-        description: error.message,
+        description: friendlyError,
         variant: "destructive",
       });
+    }
+  };
+  
+  const resendVerificationEmail = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+      
+      if (error) {
+        const friendlyError = getAuthErrorMessage(error);
+        toast({
+          title: "Error sending verification email",
+          description: friendlyError,
+          variant: "destructive",
+        });
+        return { error: friendlyError };
+      }
+      
+      toast({
+        title: "Verification email sent",
+        description: "Please check your inbox for the verification link.",
+      });
+      
+      return { error: null };
+    } catch (error: any) {
+      const friendlyError = getAuthErrorMessage(error);
+      toast({
+        title: "Error sending verification email",
+        description: friendlyError,
+        variant: "destructive",
+      });
+      return { error: friendlyError };
     }
   };
 
@@ -175,6 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
     signInWithGoogle,
+    resendVerificationEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

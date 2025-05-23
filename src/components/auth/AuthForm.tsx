@@ -6,21 +6,39 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "./AuthProvider";
+import { cleanupAuthState } from "@/utils/authUtils";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function AuthForm() {
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resendVerificationEmail } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showResendOption, setShowResendOption] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage("");
+    setShowResendOption(false);
+    
+    // Clear any previous auth state
+    cleanupAuthState();
     
     const { error } = await signIn(email, password);
     
-    if (!error) {
+    if (error) {
+      setErrorMessage(error);
+      // If the error is about email verification, show resend option
+      if (error.includes("verify your email")) {
+        setShowResendOption(true);
+      }
+    } else {
+      // Success - navigate to home
       navigate("/");
     }
     
@@ -30,14 +48,33 @@ export function AuthForm() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage("");
+    
+    // Clear any previous auth state
+    cleanupAuthState();
     
     const { error } = await signUp(email, password);
     
-    if (!error) {
-      // Stay on the page for email verification
+    if (error) {
+      setErrorMessage(error);
     }
     
     setIsLoading(false);
+  };
+  
+  const handleResendVerification = async () => {
+    if (!email) {
+      setErrorMessage("Please enter your email address");
+      return;
+    }
+    
+    setResendLoading(true);
+    const { error } = await resendVerificationEmail(email);
+    setResendLoading(false);
+    
+    if (!error) {
+      setShowResendOption(false);
+    }
   };
 
   return (
@@ -56,6 +93,27 @@ export function AuthForm() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {errorMessage && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
+            
+            {showResendOption && (
+              <div className="p-3 bg-background/80 border border-border rounded-md">
+                <p className="text-sm mb-2">Haven't received the verification email?</p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleResendVerification}
+                  disabled={resendLoading}
+                >
+                  {resendLoading ? "Sending..." : "Resend verification email"}
+                </Button>
+              </div>
+            )}
+            
             <form className="space-y-4" onSubmit={handleSignIn}>
               <div className="space-y-2">
                 <Input
@@ -114,6 +172,13 @@ export function AuthForm() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {errorMessage && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
+            
             <form className="space-y-4" onSubmit={handleSignUp}>
               <div className="space-y-2">
                 <Input
