@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
@@ -11,13 +10,15 @@ interface UseModelLoaderProps {
   modelBlob?: Blob | null;
   onError: (error: any) => void;
   modelId?: string;
+  maxRetries?: number;
 }
 
 export const useModelLoader = ({ 
   modelSource, 
   modelBlob, 
   onError,
-  modelId: providedModelId 
+  modelId: providedModelId,
+  maxRetries = 2
 }: UseModelLoaderProps) => {
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState<THREE.Group | null>(null);
@@ -30,10 +31,19 @@ export const useModelLoader = ({
   const modelIdRef = useRef<string>(
     providedModelId || `modelloader-${Math.random().toString(36).substring(2, 10)}`
   );
+  const mountedRef = useRef<boolean>(true);
   
   // Add refs to track current source to prevent infinite loops
   const currentSourceRef = useRef<string | Blob | null>(null);
   const loadAttemptRef = useRef<number>(0);
+
+  // Track component mount state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     console.log(`useModelLoader: Effect triggered for ${modelIdRef.current}`);
@@ -55,10 +65,12 @@ export const useModelLoader = ({
     }
     
     // Limit load attempts to prevent infinite loops
-    if (loadAttemptRef.current > 3) {
+    if (loadAttemptRef.current > maxRetries) {
       console.log(`Too many load attempts for ${modelIdRef.current}, aborting`);
-      setLoading(false);
-      onError(new Error("Too many load attempts"));
+      if (mountedRef.current) {
+        setLoading(false);
+        onError(new Error("Too many load attempts"));
+      }
       return;
     }
     
@@ -80,19 +92,32 @@ export const useModelLoader = ({
     // Clean up previous model resources
     if (model) {
       console.log(`Cleaning up previous model resources for ${modelIdRef.current}`);
-      cleanupResources(model, objectUrlRef.current, controllerRef.current);
-      setModel(null);
+      cleanupResources(model, objectUrlRef.current, null);
+      if (mountedRef.current) {
+        setModel(null);
+      }
     }
     
     // Create a new abort controller for this load operation
     controllerRef.current = new AbortController();
     
     // Set loading state
-    setLoading(true);
+    if (mountedRef.current) {
+      setLoading(true);
+    }
     isLoadingRef.current = true;
     
     const loadModel = async () => {
       try {
+        // Check if component is still mounted
+        if (!mountedRef.current) return;
+        
+        // Check if the controller is still valid (not aborted)
+        if (controllerRef.current?.signal.aborted) {
+          console.log(`Load operation was already aborted for ${modelIdRef.current}`);
+          return;
+        }
+        
         let modelUrl: string;
         
         // Handle different source types
@@ -112,28 +137,46 @@ export const useModelLoader = ({
           console.log(`Loading from URL string for ${modelIdRef.current}: ${modelUrl}`);
         } else {
           console.log(`Invalid model source for ${modelIdRef.current}`);
-          setLoading(false);
+          if (mountedRef.current) {
+            setLoading(false);
+          }
           isLoadingRef.current = false;
+          return;
+        }
+        
+        // Check again if the controller is still valid
+        if (controllerRef.current?.signal.aborted) {
+          console.log(`Load operation was aborted before queue for ${modelIdRef.current}`);
           return;
         }
         
         // Queue the model load
         const loadedModel = await modelQueueManager.queueModelLoad(
           modelIdRef.current,
-          () => loadModelWithFallback(modelUrl, {
-            signal: controllerRef.current?.signal,
-            onProgress: (progress) => {
-              // Optional progress tracking
-              const percent = Math.round((progress.loaded / progress.total) * 100);
-              if (percent % 25 === 0) { // Log only at 0%, 25%, 50%, 75%, 100%
-                console.log(`Loading progress for ${modelIdRef.current}: ${percent}%`);
-              }
+          () => {
+            // Check if aborted before starting the actual load
+            if (controllerRef.current?.signal.aborted) {
+              throw new DOMException('Load operation aborted', 'AbortError');
             }
-          })
+            
+            return loadModelWithFallback(modelUrl, {
+              signal: controllerRef.current?.signal,
+              onProgress: (progress) => {
+                // Optional progress tracking
+                const percent = Math.round((progress.loaded / progress.total) * 100);
+                if (percent % 25 === 0) { // Log only at 0%, 25%, 50%, 75%, 100%
+                  console.log(`Loading progress for ${modelIdRef.current}: ${percent}%`);
+                }
+              }
+            });
+          },
+          1 // Higher priority for direct model loads
         );
         
+        // Check if component is still mounted and load wasn't aborted
+        if (!mountedRef.current) return;
         if (controllerRef.current?.signal.aborted) {
-          console.log(`Load operation was aborted for ${modelIdRef.current}`);
+          console.log(`Load operation was aborted after completion for ${modelIdRef.current}`);
           return;
         }
         
@@ -144,14 +187,37 @@ export const useModelLoader = ({
         console.log(`Model ${modelIdRef.current} loaded successfully`);
         
       } catch (error) {
-        if (controllerRef.current?.signal.aborted) {
+        // Check if component is still mounted
+        if (!mountedRef.current) return;
+        
+        // Check if this was an abort error
+        if (error instanceof DOMException && error.name === 'AbortError') {
           console.log(`Error ignored due to abort for ${modelIdRef.current}`);
+          return;
+        }
+        
+        // For non-abort errors, retry if we haven't exceeded max attempts
+        if (loadAttemptRef.current < maxRetries) {
+          console.log(`Retrying load for ${modelIdRef.current}, attempt ${loadAttemptRef.current + 1} of ${maxRetries}`);
+          
+          // Use exponential backoff for retries
+          const delay = Math.min(1000 * Math.pow(2, loadAttemptRef.current), 5000);
+          setTimeout(() => {
+            if (mountedRef.current) {
+              // Reset controller and try again
+              controllerRef.current = new AbortController();
+              loadModel();
+            }
+          }, delay);
           return;
         }
         
         console.error(`Failed to load model ${modelIdRef.current}:`, error);
         onError(error);
-        setLoading(false);
+        
+        if (mountedRef.current) {
+          setLoading(false);
+        }
         isLoadingRef.current = false;
       }
     };
@@ -162,6 +228,7 @@ export const useModelLoader = ({
     return () => {
       if (controllerRef.current) {
         controllerRef.current.abort();
+        controllerRef.current = null;
       }
       
       // Don't dispose the model here - let the component using it handle disposal
@@ -171,12 +238,18 @@ export const useModelLoader = ({
         objectUrlRef.current = null;
       }
     };
-  }, [modelSource, modelBlob, onError, model]);
+  }, [modelSource, modelBlob, onError, model, maxRetries]);
   
   // Clean up all resources when unmounting
   useEffect(() => {
     return () => {
-      cleanupResources(model, objectUrlRef.current, controllerRef.current);
+      mountedRef.current = false;
+      
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+      
+      cleanupResources(model, objectUrlRef.current, null);
       console.log(`Cleaned up resources on unmount for ${modelIdRef.current}`);
     };
   }, []);
