@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import EnhancedModelViewer from "@/components/model-viewer/EnhancedModelViewer";
+import ModelViewer from "@/components/model-viewer";
 import { 
   Dialog, 
   DialogContent, 
@@ -16,21 +16,13 @@ interface ModelViewerDialogProps {
   onOpenChange: (open: boolean) => void;
   modelUrl: string | null;
   onClose: () => void;
-  modelName?: string;
-  creatorName?: string;
-  creatorAvatar?: string;
-  createdAt?: string;
 }
 
 const ModelViewerDialog: React.FC<ModelViewerDialogProps> = ({
   open,
   onOpenChange,
   modelUrl,
-  onClose,
-  modelName = "3D Model",
-  creatorName,
-  creatorAvatar,
-  createdAt
+  onClose
 }) => {
   // Use a stable URL reference to prevent reloading when dialog reopens
   const [stableModelUrl, setStableModelUrl] = React.useState<string | null>(null);
@@ -63,25 +55,34 @@ const ModelViewerDialog: React.FC<ModelViewerDialogProps> = ({
   };
 
   // Extract model name for better UX
-  const displayModelName = modelName || (stableModelUrl ? 
+  const modelName = stableModelUrl ? 
     stableModelUrl.split('/').pop()?.split('?')[0] || '3D Model' : 
-    '3D Model');
+    '3D Model';
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[1000px] p-0 bg-gray-900/90 border border-white/10 h-[80vh] max-h-[800px]">
+      <DialogContent className="sm:max-w-[800px] p-0 bg-gray-900/90 border border-white/10">
+        <DialogHeader className="p-4 border-b border-white/10">
+          <DialogTitle className="flex justify-between items-center">
+            <span>3D Model Viewer: {modelName}</span>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+                <X size={16} />
+              </Button>
+            </DialogClose>
+          </DialogTitle>
+        </DialogHeader>
         {open && stableModelUrl && (
-          <EnhancedModelViewer 
+          <ModelViewer 
             modelUrl={stableModelUrl}
             isLoading={false}
-            title={displayModelName}
-            creatorName={creatorName}
-            creatorAvatar={creatorAvatar}
-            createdAt={createdAt}
-            onClose={onClose}
-            isDialog={true}
           />
         )}
+        <DialogFooter className="p-4 border-t border-white/10">
+          <p className="text-xs text-white/50">
+            Note: Only one 3D model can be viewed at a time to ensure optimal performance.
+          </p>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
