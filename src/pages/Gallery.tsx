@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
@@ -8,16 +7,17 @@ import GalleryHeader from "@/components/gallery/GalleryHeader";
 import GalleryGrid from "@/components/gallery/GalleryGrid";
 import ModelViewerDialog from "@/components/gallery/ModelViewerDialog";
 import CallToAction from "@/components/gallery/CallToAction";
-import ModelViewer from "@/components/model-viewer";
 import { useGalleryFiles } from "@/components/gallery/useGalleryFiles";
 import { useModelUpload } from "@/components/gallery/useModelUpload";
 import { useModelViewer } from "@/components/gallery/useModelViewer";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const Gallery = () => {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   
   // Use custom hooks to manage gallery functionality
   const { images, isLoading, fetchImagesFromBucket } = useGalleryFiles();
@@ -90,9 +90,13 @@ const Gallery = () => {
             <div className="mb-16">
               <h2 className="text-2xl font-bold mb-4 text-gradient text-center">Preview Your Uploaded Model</h2>
               <div className="max-w-3xl mx-auto">
-                <ModelViewer 
+                <EnhancedModelViewer 
                   modelUrl={customModelUrl} 
                   isLoading={false}
+                  title={customModelFile?.name || "Uploaded Model"}
+                  creatorName={profile?.full_name || user?.email?.split('@')[0] || "You"}
+                  creatorAvatar={profile?.avatar_url}
+                  createdAt={new Date().toISOString()}
                 />
               </div>
             </div>
@@ -122,6 +126,10 @@ const Gallery = () => {
         onOpenChange={setModelViewerOpen}
         modelUrl={viewingModel}
         onClose={handleCloseModelViewer}
+        modelName={viewingModel?.split('/').pop()?.split('?')[0] || "3D Model"}
+        creatorName={profile?.full_name || user?.email?.split('@')[0] || "Anonymous"}
+        creatorAvatar={profile?.avatar_url}
+        createdAt={new Date().toISOString()}
       />
       
       <Footer />
