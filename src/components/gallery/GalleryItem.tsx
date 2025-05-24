@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Eye } from "lucide-react";
@@ -24,6 +23,22 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
   const [isPreviewLoaded, setIsPreviewLoaded] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
 
+  // Clean URL to prevent cache-busting issues
+  const cleanUrl = React.useMemo(() => {
+    try {
+      if (!file.url) return file.url;
+      const url = new URL(file.url);
+      ['t', 'cb', 'cache'].forEach(param => {
+        if (url.searchParams.has(param)) {
+          url.searchParams.delete(param);
+        }
+      });
+      return url.toString();
+    } catch (e) {
+      return file.url;
+    }
+  }, [file.url]);
+
   // Load state handlers
   const handlePreviewLoaded = () => {
     setIsPreviewLoaded(true);
@@ -42,7 +57,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
   const handleViewClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onViewModel(file.url);
+    onViewModel(cleanUrl);
   };
 
   return (
@@ -50,7 +65,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
       <div className="aspect-square relative overflow-hidden bg-white/5">
         {file.type === 'image' ? (
           <img 
-            src={`${file.url}?t=${Date.now()}`} 
+            src={cleanUrl} 
             alt={file.name} 
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
@@ -60,7 +75,7 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
             {!previewFailed ? (
               <div className="w-full h-full" onLoad={handlePreviewLoaded}>
                 <ModelPreview 
-                  modelUrl={file.url} 
+                  modelUrl={cleanUrl} 
                   fileName={file.name} 
                 />
               </div>
@@ -102,4 +117,23 @@ const GalleryItem: React.FC<GalleryItemProps> = ({ file, onDownload, onViewModel
   );
 };
 
-export default GalleryItem;
+export default React.memo(GalleryItem, (prevProps, nextProps) => {
+  // Only re-render if the file ID or URL has significantly changed
+  try {
+    const prevUrl = new URL(prevProps.file.url);
+    const nextUrl = new URL(nextProps.file.url);
+    
+    // Remove cache-busting parameters
+    ['t', 'cb', 'cache'].forEach(param => {
+      prevUrl.searchParams.delete(param);
+      nextUrl.searchParams.delete(param);
+    });
+    
+    return prevProps.file.id === nextProps.file.id && 
+           prevUrl.toString() === nextUrl.toString();
+  } catch (e) {
+    // If URL parsing fails, fall back to direct comparison
+    return prevProps.file.id === nextProps.file.id && 
+           prevProps.file.url === nextProps.file.url;
+  }
+});

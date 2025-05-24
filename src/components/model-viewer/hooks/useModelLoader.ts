@@ -69,8 +69,8 @@ export const useModelLoader = ({
       console.log(`Too many load attempts for ${modelIdRef.current}, aborting`);
       if (mountedRef.current) {
         setLoading(false);
-        onError(new Error("Too many load attempts"));
       }
+      onError(new Error("Too many load attempts"));
       return;
     }
     
@@ -180,8 +180,10 @@ export const useModelLoader = ({
           return;
         }
         
-        setModel(loadedModel);
-        setLoading(false);
+        if (mountedRef.current) {
+          setModel(loadedModel);
+          setLoading(false);
+        }
         isLoadingRef.current = false;
         loadAttemptRef.current = 0; // Reset counter on success
         console.log(`Model ${modelIdRef.current} loaded successfully`);

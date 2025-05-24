@@ -22,6 +22,7 @@ const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
     modelSource, 
     modelBlob,
     modelId: modelIdRef.current,
+    maxRetries: 2,
     onError: (err) => {
       // Only propagate non-abort errors
       if (!(err instanceof DOMException && err.name === 'AbortError')) {

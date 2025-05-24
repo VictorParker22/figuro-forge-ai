@@ -1,4 +1,3 @@
-
 import React from "react";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +25,26 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
   onDownload, 
   onViewModel 
 }) => {
+  // Memoize the cleaned image URLs to prevent unnecessary re-renders
+  const cleanedImages = React.useMemo(() => {
+    return images.map(image => {
+      try {
+        const url = new URL(image.url);
+        ['t', 'cb', 'cache'].forEach(param => {
+          if (url.searchParams.has(param)) {
+            url.searchParams.delete(param);
+          }
+        });
+        return {
+          ...image,
+          url: url.toString()
+        };
+      } catch (e) {
+        return image;
+      }
+    });
+  }, [images]);
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -42,7 +61,7 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
     );
   }
 
-  if (images.length === 0) {
+  if (cleanedImages.length === 0) {
     return (
       <div className="text-center py-16">
         <p className="text-white/70 mb-4">No images found in the bucket yet.</p>
@@ -53,7 +72,7 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {images.map((file, index) => (
+      {cleanedImages.map((file, index) => (
         <motion.div 
           key={file.id}
           initial={{ opacity: 0, y: 20 }}
@@ -71,4 +90,4 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
   );
 };
 
-export default GalleryGrid;
+export default React.memo(GalleryGrid);

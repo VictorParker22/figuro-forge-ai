@@ -113,4 +113,29 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
   );
 };
 
-export default ModelScene;
+export default React.memo(ModelScene, (prevProps, nextProps) => {
+  // Only re-render if important props have changed
+  // For URLs, compare without cache parameters
+  const prevUrlString = prevProps.modelUrl ? cleanUrl(prevProps.modelUrl) : null;
+  const nextUrlString = nextProps.modelUrl ? cleanUrl(nextProps.modelUrl) : null;
+  
+  // For blobs, compare by reference
+  const blobsEqual = prevProps.modelBlob === nextProps.modelBlob;
+  
+  return prevUrlString === nextUrlString && 
+         blobsEqual && 
+         prevProps.autoRotate === nextProps.autoRotate;
+});
+
+// Helper function to clean URLs of cache parameters
+function cleanUrl(url: string): string {
+  try {
+    const parsedUrl = new URL(url);
+    ['t', 'cb', 'cache'].forEach(param => {
+      parsedUrl.searchParams.delete(param);
+    });
+    return parsedUrl.toString();
+  } catch (e) {
+    return url;
+  }
+}

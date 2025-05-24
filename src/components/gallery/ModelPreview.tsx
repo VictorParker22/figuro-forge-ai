@@ -153,4 +153,23 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   );
 };
 
-export default ModelPreview;
+export default React.memo(ModelPreview, (prevProps, nextProps) => {
+  // Only re-render if the URL has significantly changed (ignoring cache parameters)
+  try {
+    const prevUrl = new URL(prevProps.modelUrl);
+    const nextUrl = new URL(nextProps.modelUrl);
+    
+    // Remove cache-busting parameters
+    ['t', 'cb', 'cache'].forEach(param => {
+      prevUrl.searchParams.delete(param);
+      nextUrl.searchParams.delete(param);
+    });
+    
+    return prevUrl.toString() === nextUrl.toString() && 
+           prevProps.fileName === nextProps.fileName;
+  } catch (e) {
+    // If URL parsing fails, fall back to direct comparison
+    return prevProps.modelUrl === nextProps.modelUrl && 
+           prevProps.fileName === nextProps.fileName;
+  }
+});
