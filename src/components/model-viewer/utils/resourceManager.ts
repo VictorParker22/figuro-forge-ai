@@ -1,4 +1,3 @@
-
 import * as THREE from "three";
 import { disposeModel } from "./modelUtils";
 
@@ -14,7 +13,7 @@ export const cleanupResources = (
   abortController: AbortController | null
 ): void => {
   // Abort any in-progress loads
-  if (abortController) {
+  if (abortController && !abortController.signal.aborted) {
     try {
       abortController.abort();
       console.log("Aborted in-progress model load");

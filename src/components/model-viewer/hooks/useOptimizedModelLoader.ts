@@ -15,6 +15,9 @@ interface UseOptimizedModelLoaderOptions {
   maxRetries?: number;
 }
 
+/**
+ * Custom hook for optimized model loading with queue management and visibility optimization
+ */
 export const useOptimizedModelLoader = ({
   modelSource,
   modelBlob,
@@ -34,10 +37,12 @@ export const useOptimizedModelLoader = ({
   const mountedRef = useRef<boolean>(true);
   const { toast } = useToast();
 
+  // Generate a stable ID for this model that won't change between renders
   const modelIdRef = useRef<string>(
     providedModelId || `model-${(modelSource || '').split('/').pop()?.replace(/\.\w+$/, '')}-${Math.random().toString(36).substring(2, 7)}`
   );
 
+  // Cleanup function to handle resource disposal properly
   const cleanupActiveResources = () => {
     if (activeSourceRef.current) {
       // First abort any ongoing load
@@ -65,6 +70,7 @@ export const useOptimizedModelLoader = ({
     }
   };
 
+  // Track component mount state
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -72,17 +78,21 @@ export const useOptimizedModelLoader = ({
     };
   }, []);
 
+  // Main effect for loading models
   useEffect(() => {
+    // Skip loading if not visible
     if (!visible) {
       console.log(`Model ${modelIdRef.current} not visible, skipping load`);
       return;
     }
 
+    // Skip if no model source
     if (!modelSource && !modelBlob) {
       console.log(`No source for model ${modelIdRef.current}, skipping load`);
       return;
     }
     
+    // Check if source has actually changed to prevent infinite loops
     const currentSource = modelBlob || modelSource;
     if (activeSourceRef.current === currentSource && model !== null) {
       console.log(`Model ${modelIdRef.current} source unchanged, keeping existing model`);
@@ -93,9 +103,11 @@ export const useOptimizedModelLoader = ({
     activeSourceRef.current = currentSource;
     retryCountRef.current = 0;
     
+    // Clean up previous resources before starting new load
     cleanupActiveResources();
 
     const loadModel = async () => {
+      // Create a new abort controller for this load
       abortControllerRef.current = new AbortController();
       const { signal } = abortControllerRef.current;
 
@@ -104,11 +116,13 @@ export const useOptimizedModelLoader = ({
         setLoading(true);
         setError(null);
         
+        // Create a URL if we have a blob
         if (modelBlob) {
           objectUrlRef.current = URL.createObjectURL(modelBlob);
           console.log(`Created object URL for ${modelIdRef.current}: ${objectUrlRef.current}`);
         }
 
+        // Queue the model load
         const loadedModel = await modelQueueManager.queueModelLoad(
           modelIdRef.current,
           () => loadModelWithFallback(
@@ -129,6 +143,7 @@ export const useOptimizedModelLoader = ({
         const isAbortError = err instanceof DOMException && err.name === 'AbortError';
         const isDuplicateLoad = err instanceof Error && err.message.includes('already being loaded');
         
+        // Retry logic for non-abort errors
         if (!isAbortError && !isDuplicateLoad && retryCountRef.current < maxRetries) {
           retryCountRef.current++;
           console.log(`Retrying model load (${retryCountRef.current}/${maxRetries})`);
@@ -142,6 +157,7 @@ export const useOptimizedModelLoader = ({
           return;
         }
         
+        // Only set error for non-abort errors
         if (!isAbortError && !isDuplicateLoad) {
           console.error(`Error loading model ${modelIdRef.current}:`, err);
           setError(err as Error);
@@ -159,6 +175,7 @@ export const useOptimizedModelLoader = ({
 
     loadModel();
 
+    // Cleanup function
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -167,6 +184,7 @@ export const useOptimizedModelLoader = ({
     };
   }, [modelSource, modelBlob, visible, onError, maxRetries, priority]);
 
+  // Clean up resources when component unmounts
   useEffect(() => {
     return () => {
       mountedRef.current = false;

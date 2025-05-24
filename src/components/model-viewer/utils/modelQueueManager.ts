@@ -5,7 +5,10 @@ class ModelQueueManager {
   private static instance: ModelQueueManager;
   private loadingCount = 0;
   private maxConcurrent = 1; // Fixed to 1 to prevent overloading WebGL contexts
-  private queue: Array<() => Promise<unknown>> = [];
+  private queue: Array<{
+    execute: () => Promise<unknown>,
+    priority: number
+  }> = [];
   private activeLoaders = new Set<string>();
   private abortControllers = new Map<string, AbortController>();
   private processingQueue = false;
@@ -67,7 +70,8 @@ class ModelQueueManager {
    */
   public async queueModelLoad<T>(
     modelId: string,
-    loadFunction: () => Promise<T>
+    loadFunction: () => Promise<T>,
+    priority: number = 0
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       // If already loading this model, reject immediately
@@ -80,7 +84,10 @@ class ModelQueueManager {
         if (this.loadingCount >= this.maxConcurrent) {
           // Queue for later if too many concurrent loads
           console.log(`[Queue] Delaying load of ${modelId}, current loads: ${this.loadingCount}/${this.maxConcurrent}`);
-          this.queue.push(executeLoad);
+          this.queue.push({
+            execute: executeLoad,
+            priority
+          });
           return;
         }
 
@@ -135,7 +142,10 @@ class ModelQueueManager {
         executeLoad();
       } else {
         console.log(`[Queue] Queuing model: ${modelId}, Queue length: ${this.queue.length + 1}`);
-        this.queue.push(executeLoad);
+        this.queue.push({
+          execute: executeLoad,
+          priority
+        });
       }
     });
   }
@@ -158,12 +168,15 @@ class ModelQueueManager {
     
     try {
       if (this.queue.length > 0 && this.loadingCount < this.maxConcurrent) {
+        // Sort queue by priority (higher priority first)
+        this.queue.sort((a, b) => b.priority - a.priority);
+        
         console.log(`[Queue] Processing next in queue, remaining: ${this.queue.length}`);
         const nextLoad = this.queue.shift();
         if (nextLoad) {
           this.lastProcessTime = now;
           setTimeout(() => {
-            nextLoad();
+            nextLoad.execute();
           }, 300); // Increased delay to prevent race conditions
         }
       }

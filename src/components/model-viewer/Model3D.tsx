@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from "react";
 import { Center } from "@react-three/drei";
 import LoadingSpinner from "./LoadingSpinner";
@@ -23,7 +22,15 @@ const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
     modelSource, 
     modelBlob,
     modelId: modelIdRef.current,
-    onError 
+    onError: (err) => {
+      // Only propagate non-abort errors
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        console.error(`Error loading model ${modelName}:`, err);
+        onError(err);
+      } else {
+        console.log(`Model load aborted for ${modelName}`);
+      }
+    }
   });
 
   // Debug logging for tracking model load status
