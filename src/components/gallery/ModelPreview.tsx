@@ -45,12 +45,13 @@ const ModelContent = ({
     priority: isVisible ? 1 : 0,
     maxRetries: 3,
     onError: (err) => {
-      if (err instanceof DOMException && err.name === 'AbortError') {
+      // Only propagate non-abort errors
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        console.error(`Error loading model ${cleanUrl}:`, err);
+        onError(err);
+      } else {
         console.log(`Model load aborted for ${cleanUrl}`);
-        return;
       }
-      console.error(`Error loading model ${cleanUrl}:`, err);
-      onError(err);
     }
   });
   
@@ -90,12 +91,9 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   }, [modelUrl]);
   
   const handleError = (error: any) => {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      return;
-    }
-    
     // Only set error state for non-abort errors
-    if (!(error instanceof Error && error.message.includes('already being loaded'))) {
+    if (!(error instanceof DOMException && error.name === 'AbortError') && 
+        !(error instanceof Error && error.message.includes('already being loaded'))) {
       console.error(`ModelPreview error for ${fileName}:`, error);
       setHasError(true);
     }

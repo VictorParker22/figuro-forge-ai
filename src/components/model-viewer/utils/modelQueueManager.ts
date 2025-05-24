@@ -42,7 +42,10 @@ class ModelQueueManager {
     if (this.abortControllers.has(modelId)) {
       try {
         console.log(`[Queue] Aborting model load: ${modelId}`);
-        this.abortControllers.get(modelId)?.abort();
+        const controller = this.abortControllers.get(modelId);
+        if (controller && !controller.signal.aborted) {
+          controller.abort();
+        }
         this.abortControllers.delete(modelId);
         this.activeLoaders.delete(modelId);
         
@@ -92,29 +95,38 @@ class ModelQueueManager {
           
           const result = await loadFunction();
           
-          // Double check the load wasn't aborted
+          // Check if the load was aborted before resolving
           if (controller.signal.aborted) {
             throw new DOMException('Load operation aborted', 'AbortError');
           }
           
-          resolve(result);
-          return result;
+          // Only resolve if the controller is still valid and not aborted
+          if (this.abortControllers.get(modelId) === controller) {
+            resolve(result);
+            return result;
+          } else {
+            throw new DOMException('Load operation aborted', 'AbortError');
+          }
         } catch (error) {
+          // Only reject with non-abort errors if the controller is still valid
           if (error instanceof DOMException && error.name === 'AbortError') {
             console.log(`[Queue] Loading of model ${modelId} was aborted`);
             reject(error);
-          } else {
+          } else if (this.abortControllers.get(modelId) === controller) {
             console.error(`[Queue] Error loading model ${modelId}:`, error);
             reject(error);
           }
         } finally {
-          this.loadingCount--;
-          this.activeLoaders.delete(modelId);
-          this.abortControllers.delete(modelId);
-          
-          // Add a delay before processing the next item
-          this.lastProcessTime = Date.now();
-          setTimeout(() => this.processQueue(), 500);
+          // Only cleanup if this controller is still the active one
+          if (this.abortControllers.get(modelId) === controller) {
+            this.loadingCount--;
+            this.activeLoaders.delete(modelId);
+            this.abortControllers.delete(modelId);
+            
+            // Add a delay before processing the next item
+            this.lastProcessTime = Date.now();
+            setTimeout(() => this.processQueue(), 500);
+          }
         }
       };
 
@@ -178,8 +190,10 @@ class ModelQueueManager {
     // Abort all in-progress loads
     this.abortControllers.forEach((controller, modelId) => {
       try {
-        console.log(`[Queue] Aborting model load during reset: ${modelId}`);
-        controller.abort();
+        if (!controller.signal.aborted) {
+          console.log(`[Queue] Aborting model load during reset: ${modelId}`);
+          controller.abort();
+        }
       } catch (error) {
         console.error(`Error aborting model load for ${modelId}:`, error);
       }

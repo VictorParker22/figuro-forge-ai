@@ -54,7 +54,8 @@ export const useOptimizedModelLoader = ({
       );
       
       // Only abort queue if we're actually changing sources
-      if (activeSourceRef.current !== modelBlob && activeSourceRef.current !== modelSource) {
+      const currentSource = modelBlob || modelSource;
+      if (activeSourceRef.current !== currentSource) {
         modelQueueManager.abortModelLoad(modelIdRef.current);
       }
       
