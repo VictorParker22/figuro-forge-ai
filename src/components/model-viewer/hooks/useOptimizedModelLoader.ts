@@ -40,13 +40,20 @@ export const useOptimizedModelLoader = ({
 
   const cleanupActiveResources = () => {
     if (activeSourceRef.current) {
+      // First abort any ongoing load
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+
+      // Then cleanup resources
       cleanupResources(
         model, 
         objectUrlRef.current,
-        abortControllerRef.current
+        null // Don't pass abortController since we already handled it
       );
       
-      // Only abort if we're actually changing sources
+      // Only abort queue if we're actually changing sources
       if (activeSourceRef.current !== modelBlob && activeSourceRef.current !== modelSource) {
         modelQueueManager.abortModelLoad(modelIdRef.current);
       }
@@ -81,6 +88,7 @@ export const useOptimizedModelLoader = ({
       return;
     }
     
+    console.log(`Loading new model source for ${modelIdRef.current}:`, currentSource);
     activeSourceRef.current = currentSource;
     retryCountRef.current = 0;
     
@@ -118,8 +126,9 @@ export const useOptimizedModelLoader = ({
         if (!mountedRef.current) return;
         
         const isAbortError = err instanceof DOMException && err.name === 'AbortError';
+        const isDuplicateLoad = err instanceof Error && err.message.includes('already being loaded');
         
-        if (!isAbortError && retryCountRef.current < maxRetries) {
+        if (!isAbortError && !isDuplicateLoad && retryCountRef.current < maxRetries) {
           retryCountRef.current++;
           console.log(`Retrying model load (${retryCountRef.current}/${maxRetries})`);
           
@@ -132,11 +141,13 @@ export const useOptimizedModelLoader = ({
           return;
         }
         
-        console.error(`Error loading model ${modelIdRef.current}:`, err);
-        setError(err as Error);
-        
-        if (onError && !isAbortError) {
-          onError(err);
+        if (!isAbortError && !isDuplicateLoad) {
+          console.error(`Error loading model ${modelIdRef.current}:`, err);
+          setError(err as Error);
+          
+          if (onError) {
+            onError(err);
+          }
         }
       } finally {
         if (mountedRef.current) {
