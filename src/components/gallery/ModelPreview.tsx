@@ -15,10 +15,12 @@ interface ModelPreviewProps {
 
 const ModelContent = ({ 
   modelUrl, 
-  isVisible 
+  isVisible,
+  onError 
 }: { 
   modelUrl: string; 
-  isVisible: boolean 
+  isVisible: boolean;
+  onError: (error: any) => void;
 }) => {
   const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}-${Math.random().toString(36).substring(2, 9)}`);
   
@@ -48,6 +50,7 @@ const ModelContent = ({
         return;
       }
       console.error(`Error loading model ${cleanUrl}:`, err);
+      onError(err);
     }
   });
   
@@ -56,7 +59,6 @@ const ModelContent = ({
   }
   
   if (error || !model) {
-    console.error(`Failed to load model: ${cleanUrl}`, error);
     return <DummyBox />;
   }
   
@@ -91,8 +93,12 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return;
     }
-    console.error(`ModelPreview error for ${fileName}:`, error);
-    setHasError(true);
+    
+    // Only set error state for non-abort errors
+    if (!(error instanceof Error && error.message.includes('already being loaded'))) {
+      console.error(`ModelPreview error for ${fileName}:`, error);
+      setHasError(true);
+    }
   };
 
   if (hasError) {
@@ -125,7 +131,11 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
             
             <Suspense fallback={<LoadingSpinner />}>
-              <ModelContent modelUrl={cleanModelUrl} isVisible={isIntersecting || wasEverVisible} />
+              <ModelContent 
+                modelUrl={cleanModelUrl} 
+                isVisible={isIntersecting || wasEverVisible} 
+                onError={handleError}
+              />
             </Suspense>
             
             <OrbitControls 
