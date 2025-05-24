@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 // Save image to storage and get public URL
 export const saveImageToStorage = async (imageBlob: Blob, figurineId: string): Promise<string | null> => {
   try {
-    // Use a public storage path that doesn't require authentication
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Use a path that works with RLS policies - public folder is typically allowed for all users
     const filePath = `public/${figurineId}.png`;
     
     // Upload image to storage
