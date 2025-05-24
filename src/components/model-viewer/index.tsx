@@ -1,4 +1,3 @@
-
 import React from "react";
 import { motion } from "framer-motion";
 import ModelHeader from "./ModelHeader";
@@ -50,7 +49,7 @@ const ModelViewer = ({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="glass-panel rounded-xl overflow-hidden"
+      className="glass-panel rounded-xl overflow-hidden h-full flex flex-col"
       ref={containerRef}
     >
       <ModelHeader 
@@ -68,7 +67,7 @@ const ModelViewer = ({
         className="hidden"
       />
 
-      <div className="h-[400px] relative">
+      <div className="flex-grow relative">
         {isLoading ? (
           <LoadingView progress={progress} />
         ) : shouldShowError ? (

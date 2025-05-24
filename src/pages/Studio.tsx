@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -31,7 +30,6 @@ const Studio = () => {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const { toast } = useToast();
   
-  // Use the tab navigation hook instead of local state
   const { activeTab, setActiveTab } = useTabNavigation({
     defaultTab: 'create',
     tabs: ['create', 'gallery']
@@ -54,13 +52,11 @@ const Studio = () => {
   const navigate = useNavigate();
   const { canPerformAction, trackAction } = useUsageTracking();
 
-  // Check for authenticated user
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
       
-      // Set up auth state change listener
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         (event, session) => {
           setUser(session?.user || null);
@@ -74,7 +70,6 @@ const Studio = () => {
   }, []);
 
   useEffect(() => {
-    // Check if API key is stored in localStorage
     const savedApiKey = localStorage.getItem("tempHuggingFaceApiKey");
     if (savedApiKey) {
       setApiKey(savedApiKey);
@@ -82,11 +77,9 @@ const Studio = () => {
   }, []);
 
   useEffect(() => {
-    // Show API input if requiresApiKey is true
     setShowApiInput(requiresApiKey);
   }, [requiresApiKey]);
 
-  // When a custom model is loaded, reset any conversion process
   const handleCustomModelLoad = (url: string, file: File) => {
     setCustomModelUrl(url);
     setCustomModelFile(file);
@@ -96,13 +89,10 @@ const Studio = () => {
     });
   };
 
-  // Call directly to handleGenerate instead of trying edge function first
   const onGenerate = async (prompt: string, style: string) => {
-    // Reset custom model when generating a new image
     setCustomModelUrl(null);
     setCustomModelFile(null);
     
-    // Check if user can perform action
     if (!authUser) {
       toast({
         title: "Authentication required",
@@ -114,25 +104,20 @@ const Studio = () => {
     
     const canGenerate = canPerformAction("image_generation");
     if (!canGenerate) {
-      // Show upgrade modal
-      setShowApiInput(false); // Hide API input if shown
+      setShowApiInput(false);
       toast({
         title: "Usage limit reached",
         description: "You've reached your monthly image generation limit",
         variant: "destructive",
       });
-      // Show upgrade modal with appropriate settings
-      // ... your existing modal code
       return;
     }
     
-    // Track usage
     const tracked = await trackAction("image_generation");
     if (!tracked) {
       return;
     }
     
-    // Call the handleGenerate function with improved error handling
     try {
       const result = await handleGenerate(prompt, style, apiKey);
       
@@ -143,7 +128,6 @@ const Studio = () => {
           description: "Please enter your Hugging Face API key to continue",
         });
       } else if (!result.success) {
-        // The error property doesn't exist on the result type, so use a generic message
         toast({
           title: "Generation Failed",
           description: "Failed to generate image. Please try again.",
@@ -160,7 +144,6 @@ const Studio = () => {
     }
   };
   
-  // Handle model conversion with usage tracking
   const handleConvertWithUsageTracking = async () => {
     if (!generatedImage) {
       return;
@@ -182,22 +165,17 @@ const Studio = () => {
         description: "You've reached your monthly model conversion limit",
         variant: "destructive",
       });
-      // Show upgrade modal with appropriate settings
-      // ... your existing modal code
       return;
     }
     
-    // Track usage
     const tracked = await trackAction("model_conversion");
     if (!tracked) {
       return;
     }
     
-    // Call the original conversion function
     await handleConvertTo3D();
   };
 
-  // Handle model upload from modal
   const handleModelUpload = (url: string, file: File) => {
     setCustomModelUrl(url);
     setCustomModelFile(file);
@@ -219,7 +197,6 @@ const Studio = () => {
     navigate("/auth");
   };
 
-  // Determine which model URL to display - custom or generated
   const displayModelUrl = customModelUrl || modelUrl;
   const displayModelFile = customModelFile;
 
@@ -240,7 +217,7 @@ const Studio = () => {
   };
 
   return (
-    <div className="min-h-screen bg-figuro-dark overflow-hidden relative">
+    <div className="min-h-screen bg-figuro-dark overflow-x-hidden relative">
       <VantaBackground>
         <Header />
         
@@ -372,7 +349,6 @@ const Studio = () => {
         <Footer />
       </VantaBackground>
 
-      {/* Upload Model Modal */}
       <UploadModelModal 
         isOpen={uploadModalOpen}
         onOpenChange={setUploadModalOpen}

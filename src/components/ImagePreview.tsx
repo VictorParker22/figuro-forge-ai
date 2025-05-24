@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -37,7 +36,7 @@ const ImagePreview = ({
           <h3 className="text-lg font-medium">Generated Image</h3>
           <span className="text-xs px-2 py-1 rounded-full bg-figuro-accent/20 text-figuro-accent">Step 2</span>
         </div>
-        <div className="relative aspect-square flex flex-col items-center justify-center p-8 text-center flex-grow">
+        <div className="relative flex-grow flex flex-col items-center justify-center p-8 text-center">
           <div className="rounded-lg bg-white/5 border border-white/10 p-8 flex flex-col items-center justify-center w-full h-full">
             <Image className="text-white/30 mb-4 w-16 h-16" />
             <p className="text-white/50 mb-2">No image generated yet</p>
@@ -52,7 +51,6 @@ const ImagePreview = ({
     if (!imageSrc) return;
     
     try {
-      // Create a temporary anchor element
       const a = document.createElement('a');
       a.href = imageSrc;
       a.download = `figurine-${new Date().getTime()}.png`;
@@ -128,7 +126,7 @@ const ImagePreview = ({
         </div>
       </div>
       
-      <div className="relative aspect-square flex-grow">
+      <div className="relative flex-grow flex items-center justify-center">
         {isLoading ? (
           <div className="w-full h-full p-4 flex flex-col items-center justify-center">
             <div className="relative w-full h-full">
@@ -144,15 +142,17 @@ const ImagePreview = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="w-full h-full p-4"
+            className="w-full h-full p-4 flex items-center justify-center"
           >
             {imageSrc ? (
-              <img
-                src={imageSrc}
-                alt="Generated figurine"
-                className="w-full h-full object-contain rounded-lg shadow-lg"
-                onError={handleImageError}
-              />
+              <div className="w-full h-full flex items-center justify-center">
+                <img
+                  src={imageSrc}
+                  alt="Generated figurine"
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                  onError={handleImageError}
+                />
+              </div>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white/50">
                 No image generated yet
