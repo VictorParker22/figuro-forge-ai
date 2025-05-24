@@ -1,8 +1,8 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BucketImage } from "@/components/gallery/types";
+import { cleanUrl } from "@/components/model-viewer/utils/modelUtils";
 
 export const useGalleryFiles = () => {
   const [images, setImages] = useState<BucketImage[]>([]);
@@ -102,6 +102,14 @@ export const useGalleryFiles = () => {
     }
   };
 
+  // Clean image URLs to prevent cache-busting issues
+  const cleanedImages = useMemo(() => {
+    return images.map(image => ({
+      ...image,
+      url: cleanUrl(image.url)
+    }));
+  }, [images]);
+
   useEffect(() => {
     fetchImagesFromBucket();
     
@@ -123,7 +131,7 @@ export const useGalleryFiles = () => {
   }, [toast]);
 
   return {
-    images,
+    images: cleanedImages,
     isLoading,
     fetchImagesFromBucket
   };

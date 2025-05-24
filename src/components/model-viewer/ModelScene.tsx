@@ -6,6 +6,18 @@ import LoadingSpinner from "./LoadingSpinner";
 import DummyBox from "./DummyBox";
 import ErrorBoundary from "./ErrorBoundary";
 import Model3D from "./Model3D";
+import { cleanUrl } from "./utils/modelUtils";
+import {
+  DEFAULT_CAMERA_POSITION,
+  DEFAULT_AMBIENT_LIGHT_INTENSITY,
+  DEFAULT_DIRECTIONAL_LIGHT_POSITION,
+  DEFAULT_DIRECTIONAL_LIGHT_INTENSITY,
+  DEFAULT_ENVIRONMENT_PRESET,
+  DEFAULT_BACKGROUND_COLOR,
+  DEFAULT_CANVAS_CONFIG,
+  DEFAULT_DPR,
+  DEFAULT_ORBIT_CONTROLS
+} from "./config/modelViewerConfig";
 
 interface ModelSceneProps {
   modelUrl: string | null;
@@ -20,25 +32,30 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
   const [stableBlob, setStableBlob] = useState<Blob | null>(modelBlob || null);
   const [loadKey, setLoadKey] = useState<string>(`load-${Date.now()}`);
   
+  // Clean URL to prevent cache-busting issues
+  const cleanedModelUrl = useMemo(() => {
+    return modelUrl ? cleanUrl(modelUrl) : null;
+  }, [modelUrl]);
+  
   useEffect(() => {
-    if (modelUrl !== currentSourceRef.current) {
-      console.log("ModelScene: URL source changed to", modelUrl);
+    if (cleanedModelUrl !== currentSourceRef.current) {
+      console.log("ModelScene: URL source changed to", cleanedModelUrl);
       
       const current = currentSourceRef.current;
-      currentSourceRef.current = modelUrl;
+      currentSourceRef.current = cleanedModelUrl;
       
-      if (modelUrl || (current !== null && modelUrl !== current)) {
+      if (cleanedModelUrl || (current !== null && cleanedModelUrl !== current)) {
         setLoadKey(`load-${Date.now()}`);
         
         const timer = setTimeout(() => {
-          setStableSource(modelUrl);
-          if (modelUrl) setStableBlob(null);
+          setStableSource(cleanedModelUrl);
+          if (cleanedModelUrl) setStableBlob(null);
         }, 100);
         
         return () => clearTimeout(timer);
       }
     }
-  }, [modelUrl]);
+  }, [cleanedModelUrl]);
   
   useEffect(() => {
     if (modelBlob && modelBlob !== currentSourceRef.current) {
@@ -57,8 +74,13 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
   }, [modelBlob]);
 
   const handleModelError = (error: any) => {
-    console.error("ModelScene: Error in 3D model:", error);
-    onModelError(error);
+    // Only propagate non-abort errors
+    if (!(error instanceof DOMException && error.name === 'AbortError')) {
+      console.error("ModelScene: Error in 3D model:", error);
+      onModelError(error);
+    } else {
+      console.log("ModelScene: Load aborted");
+    }
   };
 
   return (
@@ -66,20 +88,17 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
       <Canvas 
         key={loadKey}
         shadows 
-        gl={{ 
-          powerPreference: "low-power",
-          antialias: false,
-          depth: true,
-          stencil: false,
-          alpha: true
-        }}
-        dpr={[0.8, 1]}
+        gl={DEFAULT_CANVAS_CONFIG}
+        dpr={DEFAULT_DPR}
         frameloop="demand"
       >
-        <color attach="background" args={['#1a1a1a']} />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
-        <PerspectiveCamera makeDefault position={[0, 0, 5]} />
+        <color attach="background" args={[DEFAULT_BACKGROUND_COLOR]} />
+        <ambientLight intensity={DEFAULT_AMBIENT_LIGHT_INTENSITY} />
+        <directionalLight 
+          position={DEFAULT_DIRECTIONAL_LIGHT_POSITION} 
+          intensity={DEFAULT_DIRECTIONAL_LIGHT_INTENSITY} 
+        />
+        <PerspectiveCamera makeDefault position={DEFAULT_CAMERA_POSITION} />
         
         <Suspense fallback={<LoadingSpinner />}>
           {(stableSource || stableBlob) ? (
@@ -100,14 +119,14 @@ const ModelScene = ({ modelUrl, modelBlob, autoRotate, onModelError }: ModelScen
         
         <OrbitControls 
           autoRotate={autoRotate}
-          autoRotateSpeed={2}
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          minDistance={2}
-          maxDistance={10}
+          autoRotateSpeed={DEFAULT_ORBIT_CONTROLS.autoRotateSpeed}
+          enablePan={DEFAULT_ORBIT_CONTROLS.enablePan}
+          enableZoom={DEFAULT_ORBIT_CONTROLS.enableZoom}
+          enableRotate={DEFAULT_ORBIT_CONTROLS.enableRotate}
+          minDistance={DEFAULT_ORBIT_CONTROLS.minDistance}
+          maxDistance={DEFAULT_ORBIT_CONTROLS.maxDistance}
         />
-        <Environment preset="sunset" />
+        <Environment preset={DEFAULT_ENVIRONMENT_PRESET} />
       </Canvas>
     </div>
   );
@@ -126,16 +145,3 @@ export default React.memo(ModelScene, (prevProps, nextProps) => {
          blobsEqual && 
          prevProps.autoRotate === nextProps.autoRotate;
 });
-
-// Helper function to clean URLs of cache parameters
-function cleanUrl(url: string): string {
-  try {
-    const parsedUrl = new URL(url);
-    ['t', 'cb', 'cache'].forEach(param => {
-      parsedUrl.searchParams.delete(param);
-    });
-    return parsedUrl.toString();
-  } catch (e) {
-    return url;
-  }
-}

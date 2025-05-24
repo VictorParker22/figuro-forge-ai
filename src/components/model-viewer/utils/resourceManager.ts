@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { disposeModel } from "./modelUtils";
+import { CLEANUP_DELAY } from "../config/modelViewerConfig";
 
 /**
  * Clean up resources to prevent memory leaks
@@ -89,7 +90,7 @@ class WebGLContextTracker {
       
       // Remove this timeout from the array
       this.disposalTimeouts = this.disposalTimeouts.filter(id => id !== timeoutId);
-    }, 500) as unknown as number;
+    }, CLEANUP_DELAY) as unknown as number;
     
     this.disposalTimeouts.push(timeoutId);
     

@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from "react";
 import { Center } from "@react-three/drei";
 import LoadingSpinner from "./LoadingSpinner";
 import { useModelLoader } from "./hooks/useModelLoader";
+import { DEFAULT_MODEL_SCALE, HIGH_PRIORITY } from "./config/modelViewerConfig";
 
 interface Model3DProps {
   modelSource: string | null;
@@ -23,6 +24,7 @@ const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
     modelBlob,
     modelId: modelIdRef.current,
     maxRetries: 2,
+    priority: HIGH_PRIORITY,
     onError: (err) => {
       // Only propagate non-abort errors
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
@@ -46,10 +48,14 @@ const Model3D = ({ modelSource, modelBlob, onError }: Model3DProps) => {
   }
   
   return model ? (
-    <Center scale={[1.5, 1.5, 1.5]}>
+    <Center scale={[DEFAULT_MODEL_SCALE, DEFAULT_MODEL_SCALE, DEFAULT_MODEL_SCALE]}>
       <primitive object={model} />
     </Center>
   ) : null;
 };
 
-export default Model3D;
+export default React.memo(Model3D, (prevProps, nextProps) => {
+  // Only re-render if the source has changed
+  return prevProps.modelSource === nextProps.modelSource && 
+         prevProps.modelBlob === nextProps.modelBlob;
+});

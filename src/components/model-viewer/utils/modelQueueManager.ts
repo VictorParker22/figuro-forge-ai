@@ -1,10 +1,12 @@
+import { MAX_CONCURRENT_LOADS } from "../config/modelViewerConfig";
+
 /**
  * Manager class to limit concurrent 3D model loading
  */
 class ModelQueueManager {
   private static instance: ModelQueueManager;
   private loadingCount = 0;
-  private maxConcurrent = 1; // Fixed to 1 to prevent overloading WebGL contexts
+  private maxConcurrent = MAX_CONCURRENT_LOADS;
   private queue: Array<{
     execute: () => Promise<unknown>,
     priority: number
@@ -57,7 +59,7 @@ class ModelQueueManager {
           this.loadingCount--;
         }
         
-        // Process queue in case there are pending items
+        // Process queue in case there are pending items with a delay
         setTimeout(() => this.processQueue(), 200);
       } catch (error) {
         console.error(`Error aborting model load for ${modelId}:`, error);
@@ -74,7 +76,7 @@ class ModelQueueManager {
     priority: number = 0
   ): Promise<T> {
     return new Promise((resolve, reject) => {
-      // If already loading this model, reject immediately
+      // If already loading this model, reject
       if (this.activeLoaders.has(modelId)) {
         reject(new Error(`Model ${modelId} is already being loaded`));
         return;

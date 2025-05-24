@@ -1,6 +1,6 @@
-
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { CORS_PROXIES, CACHE_PARAMS } from "../config/modelViewerConfig";
 
 interface LoadModelOptions {
   signal?: AbortSignal;
@@ -39,7 +39,7 @@ export const loadModelFromUrl = (
         
         if (options?.signal?.aborted) {
           console.log("Load operation was aborted");
-          reject(new Error("Load operation aborted"));
+          reject(new DOMException("Load operation aborted", "AbortError"));
           return;
         }
         console.log("Model loaded successfully from:", url);
@@ -74,32 +74,36 @@ export const loadModelWithFallback = async (
   options?: LoadModelOptions
 ): Promise<THREE.Group> => {
   try {
+    // Clean the URL of any cache-busting parameters
+    const cleanedUrl = cleanUrl(modelUrl);
+    
     // Try direct loading first
-    return await loadModelFromUrl(modelUrl, options);
+    return await loadModelFromUrl(cleanedUrl, options);
   } catch (directError) {
     if (options?.signal?.aborted) throw directError;
     
     // If it's a string URL and not a blob URL, try with CORS proxy
     if (typeof modelUrl === 'string' && !modelUrl.startsWith('blob:')) {
-      try {
-        const proxyUrl = `https://cors-proxy.fringe.zone/${encodeURIComponent(modelUrl)}`;
-        console.log("Trying with CORS proxy:", proxyUrl);
-        
-        return await loadModelFromUrl(proxyUrl, options);
-      } catch (proxyError) {
-        if (options?.signal?.aborted) throw proxyError;
-        
-        // Try one more fallback proxy if the first one fails
+      // Try each proxy in sequence
+      for (let i = 0; i < CORS_PROXIES.length; i++) {
         try {
-          const backupProxyUrl = `https://corsproxy.io/?${encodeURIComponent(modelUrl)}`;
-          console.log("Trying with backup CORS proxy:", backupProxyUrl);
+          const proxyUrl = `${CORS_PROXIES[i]}${encodeURIComponent(cleanUrl(modelUrl))}`;
+          console.log(`Trying with CORS proxy ${i+1}/${CORS_PROXIES.length}:`, proxyUrl);
           
-          return await loadModelFromUrl(backupProxyUrl, options);
-        } catch (backupProxyError) {
-          console.error("All loading attempts failed");
-          throw backupProxyError || proxyError || directError;
+          return await loadModelFromUrl(proxyUrl, options);
+        } catch (proxyError) {
+          if (options?.signal?.aborted) throw proxyError;
+          
+          console.error(`Proxy ${i+1} failed:`, proxyError);
+          // Continue to next proxy if available
+          if (i === CORS_PROXIES.length - 1) {
+            throw proxyError; // Throw the last error if all proxies fail
+          }
         }
       }
+      
+      // This should never be reached due to the throw in the loop above
+      throw directError;
     } else {
       // For blob URLs, just propagate the error
       throw directError;
@@ -130,5 +134,27 @@ export const revokeObjectUrl = (url: string | null): void => {
     } catch (error) {
       console.error("Error revoking object URL:", error);
     }
+  }
+};
+
+/**
+ * Clean a URL by removing cache-busting parameters
+ */
+export const cleanUrl = (url: string): string => {
+  try {
+    if (!url) return url;
+    const parsedUrl = new URL(url);
+    
+    // Remove cache-busting parameters
+    CACHE_PARAMS.forEach(param => {
+      if (parsedUrl.searchParams.has(param)) {
+        parsedUrl.searchParams.delete(param);
+      }
+    });
+    
+    return parsedUrl.toString();
+  } catch (e) {
+    // If URL parsing fails, return the original
+    return url;
   }
 };

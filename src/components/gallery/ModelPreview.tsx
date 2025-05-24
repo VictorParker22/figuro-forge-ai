@@ -7,6 +7,20 @@ import LoadingSpinner from "@/components/model-viewer/LoadingSpinner";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { useOptimizedModelLoader } from "@/components/model-viewer/hooks/useOptimizedModelLoader";
 import ModelPlaceholder from "./ModelPlaceholder";
+import { cleanUrl } from "@/components/model-viewer/utils/modelUtils";
+import {
+  DEFAULT_CAMERA_POSITION,
+  DEFAULT_AMBIENT_LIGHT_INTENSITY,
+  DEFAULT_DIRECTIONAL_LIGHT_POSITION,
+  DEFAULT_DIRECTIONAL_LIGHT_INTENSITY,
+  DEFAULT_ENVIRONMENT_PRESET,
+  DEFAULT_BACKGROUND_COLOR,
+  DEFAULT_CANVAS_CONFIG,
+  DEFAULT_DPR,
+  GALLERY_PREVIEW_ORBIT_CONTROLS,
+  DEFAULT_MODEL_SCALE,
+  MEDIUM_PRIORITY
+} from "@/components/model-viewer/config/modelViewerConfig";
 
 interface ModelPreviewProps {
   modelUrl: string;
@@ -25,24 +39,14 @@ const ModelContent = ({
   const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}-${Math.random().toString(36).substring(2, 9)}`);
   
   const cleanUrl = useMemo(() => {
-    try {
-      const url = new URL(modelUrl);
-      ['t', 'cb', 'cache'].forEach(param => {
-        if (url.searchParams.has(param)) {
-          url.searchParams.delete(param);
-        }
-      });
-      return url.toString();
-    } catch (e) {
-      return modelUrl;
-    }
+    return cleanUrl(modelUrl);
   }, [modelUrl]);
   
   const { loading, model, error } = useOptimizedModelLoader({ 
     modelSource: cleanUrl,
     visible: isVisible,
     modelId: modelIdRef.current,
-    priority: isVisible ? 1 : 0,
+    priority: MEDIUM_PRIORITY,
     maxRetries: 3,
     onError: (err) => {
       // Only propagate non-abort errors
@@ -64,7 +68,7 @@ const ModelContent = ({
   }
   
   return (
-    <primitive object={model} scale={1.5} />
+    <primitive object={model} scale={DEFAULT_MODEL_SCALE} />
   );
 };
 
@@ -77,17 +81,7 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   });
   
   const cleanModelUrl = useMemo(() => {
-    try {
-      const url = new URL(modelUrl);
-      ['t', 'cb', 'cache'].forEach(param => {
-        if (url.searchParams.has(param)) {
-          url.searchParams.delete(param);
-        }
-      });
-      return url.toString();
-    } catch (e) {
-      return modelUrl;
-    }
+    return cleanUrl(modelUrl);
   }, [modelUrl]);
   
   const handleError = (error: any) => {
@@ -112,21 +106,18 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
           <Canvas 
             id={canvasId.current}
             shadows 
-            gl={{ 
-              powerPreference: "low-power",
-              antialias: false,
-              depth: true,
-              stencil: false,
-              alpha: true
-            }}
-            dpr={[0.8, 1]}
+            gl={DEFAULT_CANVAS_CONFIG}
+            dpr={DEFAULT_DPR}
             style={{pointerEvents: "none"}}
             frameloop="demand"
           >
-            <color attach="background" args={['#1a1a1a']} />
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[10, 10, 5]} intensity={1} />
-            <PerspectiveCamera makeDefault position={[0, 0, 5]} />
+            <color attach="background" args={[DEFAULT_BACKGROUND_COLOR]} />
+            <ambientLight intensity={DEFAULT_AMBIENT_LIGHT_INTENSITY} />
+            <directionalLight 
+              position={DEFAULT_DIRECTIONAL_LIGHT_POSITION} 
+              intensity={DEFAULT_DIRECTIONAL_LIGHT_INTENSITY} 
+            />
+            <PerspectiveCamera makeDefault position={DEFAULT_CAMERA_POSITION} />
             
             <Suspense fallback={<LoadingSpinner />}>
               <ModelContent 
@@ -138,12 +129,12 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             
             <OrbitControls 
               autoRotate={isIntersecting}
-              autoRotateSpeed={1.5}
-              enablePan={false}
-              enableZoom={false}
-              enableRotate={false}
+              autoRotateSpeed={GALLERY_PREVIEW_ORBIT_CONTROLS.autoRotateSpeed}
+              enablePan={GALLERY_PREVIEW_ORBIT_CONTROLS.enablePan}
+              enableZoom={GALLERY_PREVIEW_ORBIT_CONTROLS.enableZoom}
+              enableRotate={GALLERY_PREVIEW_ORBIT_CONTROLS.enableRotate}
             />
-            <Environment preset="sunset" />
+            <Environment preset={DEFAULT_ENVIRONMENT_PRESET} />
           </Canvas>
         </ErrorBoundary>
       ) : (
@@ -160,7 +151,7 @@ export default React.memo(ModelPreview, (prevProps, nextProps) => {
     const nextUrl = new URL(nextProps.modelUrl);
     
     // Remove cache-busting parameters
-    ['t', 'cb', 'cache'].forEach(param => {
+    CACHE_PARAMS.forEach(param => {
       prevUrl.searchParams.delete(param);
       nextUrl.searchParams.delete(param);
     });

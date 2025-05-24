@@ -4,6 +4,8 @@ import { modelQueueManager } from "../utils/modelQueueManager";
 import { loadModelWithFallback } from "../utils/modelLoaderUtils";
 import { cleanupResources } from "../utils/resourceManager";
 import { useToast } from "@/hooks/use-toast";
+import { cleanUrl } from "../utils/modelUtils";
+import { DEFAULT_LOAD_RETRIES } from "../config/modelViewerConfig";
 
 interface UseOptimizedModelLoaderOptions {
   modelSource: string | null;
@@ -25,7 +27,7 @@ export const useOptimizedModelLoader = ({
   priority = 0,
   visible = true,
   modelId: providedModelId,
-  maxRetries = 2
+  maxRetries = DEFAULT_LOAD_RETRIES
 }: UseOptimizedModelLoaderOptions) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [model, setModel] = useState<THREE.Group | null>(null);
@@ -41,6 +43,14 @@ export const useOptimizedModelLoader = ({
   const modelIdRef = useRef<string>(
     providedModelId || `model-${(modelSource || '').split('/').pop()?.replace(/\.\w+$/, '')}-${Math.random().toString(36).substring(2, 7)}`
   );
+
+  // Track component mount state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Cleanup function to handle resource disposal properly
   const cleanupActiveResources = () => {
@@ -70,14 +80,6 @@ export const useOptimizedModelLoader = ({
     }
   };
 
-  // Track component mount state
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
   // Main effect for loading models
   useEffect(() => {
     // Skip loading if not visible
@@ -94,7 +96,17 @@ export const useOptimizedModelLoader = ({
     
     // Check if source has actually changed to prevent infinite loops
     const currentSource = modelBlob || modelSource;
-    if (activeSourceRef.current === currentSource && model !== null) {
+    
+    // Clean URLs for comparison
+    const cleanedModelSource = typeof modelSource === 'string' ? cleanUrl(modelSource) : null;
+    const cleanedActiveSource = typeof activeSourceRef.current === 'string' ? cleanUrl(activeSourceRef.current as string) : activeSourceRef.current;
+    
+    // Compare cleaned URLs or direct references for blobs
+    const sourceChanged = modelBlob 
+      ? modelBlob !== activeSourceRef.current 
+      : cleanedModelSource !== cleanedActiveSource;
+    
+    if (!sourceChanged && model !== null) {
       console.log(`Model ${modelIdRef.current} source unchanged, keeping existing model`);
       return;
     }
@@ -106,6 +118,8 @@ export const useOptimizedModelLoader = ({
     // Clean up previous resources before starting new load
     cleanupActiveResources();
 
+    let isActive = true;
+    
     const loadModel = async () => {
       // Create a new abort controller for this load
       abortControllerRef.current = new AbortController();
@@ -177,6 +191,7 @@ export const useOptimizedModelLoader = ({
 
     // Cleanup function
     return () => {
+      isActive = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;

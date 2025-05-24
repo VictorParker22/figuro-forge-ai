@@ -1,8 +1,8 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { modelQueueManager } from "../model-viewer/utils/modelQueueManager";
 import { webGLContextTracker } from "../model-viewer/utils/resourceManager";
+import { cleanUrl } from "../model-viewer/utils/modelUtils";
 
 // Maximum number of model viewers that can be open at once - reduced for stability
 const MAX_ACTIVE_VIEWERS = 1;
@@ -49,24 +49,6 @@ export const useModelViewer = () => {
     }, 800);
   };
 
-  // Clean URLs from cache-busting parameters
-  const cleanModelUrl = (url: string): string => {
-    try {
-      const parsedUrl = new URL(url);
-      // Remove cache-busting parameters
-      ['t', 'cb', 'cache'].forEach(param => {
-        if (parsedUrl.searchParams.has(param)) {
-          parsedUrl.searchParams.delete(param);
-        }
-      });
-      return parsedUrl.toString();
-    } catch (e) {
-      // If URL parsing fails, return the original
-      console.warn("Failed to parse model URL:", e);
-      return url;
-    }
-  };
-
   // Handle opening full model viewer
   const handleViewModel = (modelUrl: string) => {
     // First make sure the URL is valid
@@ -99,7 +81,7 @@ export const useModelViewer = () => {
     }
     
     // Clean the URL to prevent reloading and resource issues
-    const cleanedUrl = cleanModelUrl(modelUrl);
+    const cleanedUrl = cleanUrl(modelUrl);
     console.log("Opening model viewer with URL:", cleanedUrl);
     
     // First close any existing viewer to clean up resources
