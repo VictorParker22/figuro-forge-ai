@@ -31,13 +31,13 @@ const ImagePreview = ({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
-        className="glass-panel rounded-xl overflow-hidden backdrop-blur-md border border-white/20 h-full min-h-[400px]"
+        className="glass-panel rounded-xl overflow-hidden backdrop-blur-md border border-white/20 h-full flex flex-col"
       >
         <div className="p-4 border-b border-white/10 flex justify-between items-center">
           <h3 className="text-lg font-medium">Generated Image</h3>
           <span className="text-xs px-2 py-1 rounded-full bg-figuro-accent/20 text-figuro-accent">Step 2</span>
         </div>
-        <div className="relative aspect-square flex flex-col items-center justify-center p-8 text-center">
+        <div className="relative aspect-square flex flex-col items-center justify-center p-8 text-center flex-grow">
           <div className="rounded-lg bg-white/5 border border-white/10 p-8 flex flex-col items-center justify-center w-full h-full">
             <Image className="text-white/30 mb-4 w-16 h-16" />
             <p className="text-white/50 mb-2">No image generated yet</p>
@@ -89,7 +89,7 @@ const ImagePreview = ({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="glass-panel rounded-xl overflow-hidden backdrop-blur-md border border-white/20 h-full"
+      className="glass-panel rounded-xl overflow-hidden backdrop-blur-md border border-white/20 h-full flex flex-col"
     >
       <div className="p-4 border-b border-white/10 flex justify-between items-center">
         <h3 className="text-lg font-medium">Generated Image</h3>
@@ -128,7 +128,7 @@ const ImagePreview = ({
         </div>
       </div>
       
-      <div className="relative aspect-square">
+      <div className="relative aspect-square flex-grow">
         {isLoading ? (
           <div className="w-full h-full p-4 flex flex-col items-center justify-center">
             <div className="relative w-full h-full">
@@ -170,7 +170,7 @@ const ImagePreview = ({
         )}
       </div>
       
-      <div className="p-4">
+      <div className="p-4 mt-auto">
         <Button
           className="w-full bg-figuro-accent hover:bg-figuro-accent-hover h-12 flex items-center justify-center gap-2 group"
           onClick={onConvertTo3D}

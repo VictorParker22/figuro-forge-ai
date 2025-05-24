@@ -40,12 +40,12 @@ const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
   };
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="glass-panel p-6 rounded-xl backdrop-blur-md border border-white/20"
+        className="glass-panel p-6 rounded-xl backdrop-blur-md border border-white/20 mb-6"
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-white">Describe Your Figurine</h3>
@@ -105,7 +105,9 @@ const PromptForm = ({ onGenerate, isGenerating }: PromptFormProps) => {
         </form>
       </motion.div>
       
-      <ExamplePrompts onSelectPrompt={handleExampleSelect} />
+      <div className="flex-grow">
+        <ExamplePrompts onSelectPrompt={handleExampleSelect} />
+      </div>
     </div>
   );
 };
