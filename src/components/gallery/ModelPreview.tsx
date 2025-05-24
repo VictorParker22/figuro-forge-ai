@@ -19,7 +19,8 @@ import {
   DEFAULT_DPR,
   GALLERY_PREVIEW_ORBIT_CONTROLS,
   DEFAULT_MODEL_SCALE,
-  MEDIUM_PRIORITY
+  MEDIUM_PRIORITY,
+  CACHE_PARAMS
 } from "@/components/model-viewer/config/modelViewerConfig";
 
 interface ModelPreviewProps {
@@ -38,12 +39,12 @@ const ModelContent = ({
 }) => {
   const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}-${Math.random().toString(36).substring(2, 9)}`);
   
-  const cleanUrl = useMemo(() => {
+  const cleanModelUrl = useMemo(() => {
     return cleanUrl(modelUrl);
   }, [modelUrl]);
   
   const { loading, model, error } = useOptimizedModelLoader({ 
-    modelSource: cleanUrl,
+    modelSource: cleanModelUrl,
     visible: isVisible,
     modelId: modelIdRef.current,
     priority: MEDIUM_PRIORITY,
@@ -51,10 +52,10 @@ const ModelContent = ({
     onError: (err) => {
       // Only propagate non-abort errors
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
-        console.error(`Error loading model ${cleanUrl}:`, err);
+        console.error(`Error loading model ${cleanModelUrl}:`, err);
         onError(err);
       } else {
-        console.log(`Model load aborted for ${cleanUrl}`);
+        console.log(`Model load aborted for ${cleanModelUrl}`);
       }
     }
   });
