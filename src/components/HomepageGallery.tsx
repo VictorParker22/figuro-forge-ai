@@ -1,5 +1,4 @@
-
-import React from "react";
+import React, { useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Image, Box, Eye, Download } from "lucide-react";
@@ -25,15 +24,17 @@ const HomepageGallery: React.FC = () => {
   } = useModelViewer();
   
   // Limit to 10 items for homepage display
-  const limitedImages = images.slice(0, 10);
+  const limitedImages = React.useMemo(() => {
+    return images.slice(0, 10);
+  }, [images]);
 
-  const navigateToGallery = () => {
+  const navigateToGallery = useCallback(() => {
     navigate("/gallery");
-  };
+  }, [navigate]);
 
-  const navigateToStudio = () => {
+  const navigateToStudio = useCallback(() => {
     navigate("/studio");
-  };
+  }, [navigate]);
   
   // Handle downloads with a proper function that ensures content is downloaded
   const handleDownload = async (imageUrl: string, imageName: string) => {
@@ -191,4 +192,4 @@ const HomepageGallery: React.FC = () => {
   );
 };
 
-export default HomepageGallery;
+export default React.memo(HomepageGallery);

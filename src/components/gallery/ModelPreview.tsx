@@ -7,7 +7,8 @@ import LoadingSpinner from "@/components/model-viewer/LoadingSpinner";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { useOptimizedModelLoader } from "@/components/model-viewer/hooks/useOptimizedModelLoader";
 import ModelPlaceholder from "./ModelPlaceholder";
-import { cleanUrl } from "@/components/model-viewer/utils/modelUtils";
+
+// Import configuration constants
 import {
   DEFAULT_CAMERA_POSITION,
   DEFAULT_AMBIENT_LIGHT_INTENSITY,
@@ -28,19 +29,32 @@ interface ModelPreviewProps {
   fileName: string;
 }
 
+// This component will render the actual 3D model
 const ModelContent = ({ 
   modelUrl, 
-  isVisible,
-  onError 
+  isVisible 
 }: { 
   modelUrl: string; 
-  isVisible: boolean;
-  onError: (error: any) => void;
+  isVisible: boolean 
 }) => {
+  // Create a stable ID based on the URL to prevent reloads
   const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}-${Math.random().toString(36).substring(2, 9)}`);
   
+  // Clean URL from query parameters to prevent cache busting which causes reloads
   const cleanModelUrl = useMemo(() => {
-    return cleanUrl(modelUrl);
+    try {
+      const url = new URL(modelUrl);
+      // Remove all cache-busting parameters
+      CACHE_PARAMS.forEach(param => {
+        if (url.searchParams.has(param)) {
+          url.searchParams.delete(param);
+        }
+      });
+      return url.toString();
+    } catch (e) {
+      // If URL parsing fails, return the original
+      return modelUrl;
+    }
   }, [modelUrl]);
   
   const { loading, model, error } = useOptimizedModelLoader({ 
@@ -48,16 +62,7 @@ const ModelContent = ({
     visible: isVisible,
     modelId: modelIdRef.current,
     priority: MEDIUM_PRIORITY,
-    maxRetries: 3,
-    onError: (err) => {
-      // Only propagate non-abort errors
-      if (!(err instanceof DOMException && err.name === 'AbortError')) {
-        console.error(`Error loading model ${cleanModelUrl}:`, err);
-        onError(err);
-      } else {
-        console.log(`Model load aborted for ${cleanModelUrl}`);
-      }
-    }
+    onError: (err) => console.error(`Error loading model ${cleanModelUrl}:`, err)
   });
   
   if (loading) {
@@ -65,6 +70,7 @@ const ModelContent = ({
   }
   
   if (error || !model) {
+    console.error(`Failed to load model: ${cleanModelUrl}`, error);
     return <DummyBox />;
   }
   
@@ -76,28 +82,40 @@ const ModelContent = ({
 const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   const [hasError, setHasError] = useState(false);
   const { targetRef, isIntersecting, wasEverVisible } = useIntersectionObserver({
-    rootMargin: '200px',
+    rootMargin: '200px', // Reduced from 300px to improve performance
     threshold: 0.1,
-    once: true
+    once: true // Only observe once, then disconnect to prevent re-intersection triggers
   });
   
+  // Clean URL from query params for better caching
   const cleanModelUrl = useMemo(() => {
-    return cleanUrl(modelUrl);
+    try {
+      const url = new URL(modelUrl);
+      // Remove all cache-busting parameters
+      CACHE_PARAMS.forEach(param => {
+        if (url.searchParams.has(param)) {
+          url.searchParams.delete(param);
+        }
+      });
+      return url.toString();
+    } catch (e) {
+      // If URL parsing fails, return the original
+      return modelUrl;
+    }
   }, [modelUrl]);
   
+  // Handle errors silently by showing the placeholder
   const handleError = (error: any) => {
-    // Only set error state for non-abort errors
-    if (!(error instanceof DOMException && error.name === 'AbortError') && 
-        !(error instanceof Error && error.message.includes('already being loaded'))) {
-      console.error(`ModelPreview error for ${fileName}:`, error);
-      setHasError(true);
-    }
+    console.error(`ModelPreview error for ${fileName}:`, error);
+    setHasError(true);
   };
 
+  // If there's an error, show the placeholder
   if (hasError) {
     return <ModelPlaceholder fileName={fileName} />;
   }
 
+  // Create unique ID for this preview canvas to avoid conflicts
   const canvasId = useRef(`canvas-${fileName.replace(/\W/g, '')}-${Math.random().toString(36).substring(2, 10)}`);
 
   return (
@@ -109,8 +127,8 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             shadows 
             gl={DEFAULT_CANVAS_CONFIG}
             dpr={DEFAULT_DPR}
-            style={{pointerEvents: "none"}}
-            frameloop="demand"
+            style={{pointerEvents: "none"}} // Disable pointer events to prevent interaction in gallery view
+            frameloop="demand" // Only render when needed
           >
             <color attach="background" args={[DEFAULT_BACKGROUND_COLOR]} />
             <ambientLight intensity={DEFAULT_AMBIENT_LIGHT_INTENSITY} />
@@ -121,19 +139,15 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             <PerspectiveCamera makeDefault position={DEFAULT_CAMERA_POSITION} />
             
             <Suspense fallback={<LoadingSpinner />}>
-              <ModelContent 
-                modelUrl={cleanModelUrl} 
-                isVisible={isIntersecting || wasEverVisible} 
-                onError={handleError}
-              />
+              <ModelContent modelUrl={cleanModelUrl} isVisible={isIntersecting || wasEverVisible} />
             </Suspense>
             
             <OrbitControls 
-              autoRotate={isIntersecting}
-              autoRotateSpeed={GALLERY_PREVIEW_ORBIT_CONTROLS.autoRotateSpeed}
+              autoRotate={isIntersecting} // Only auto-rotate when visible
+              autoRotateSpeed={GALLERY_PREVIEW_ORBIT_CONTROLS.autoRotateSpeed} // Reduced from 4 for better performance
               enablePan={GALLERY_PREVIEW_ORBIT_CONTROLS.enablePan}
               enableZoom={GALLERY_PREVIEW_ORBIT_CONTROLS.enableZoom}
-              enableRotate={GALLERY_PREVIEW_ORBIT_CONTROLS.enableRotate}
+              enableRotate={GALLERY_PREVIEW_ORBIT_CONTROLS.enableRotate} // Disabled rotation for gallery view
             />
             <Environment preset={DEFAULT_ENVIRONMENT_PRESET} />
           </Canvas>

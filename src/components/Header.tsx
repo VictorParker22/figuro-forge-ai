@@ -1,9 +1,7 @@
-
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import FiguroMascot from "./FiguroMascot";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Menu, X, User, Settings, LogOut, ChevronDown, Image } from "lucide-react";
 import {
@@ -16,11 +14,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+// Lazy load the FiguroMascot component to avoid WASM loading issues
+const FiguroMascot = lazy(() => import("./FiguroMascot"));
+
 const Header = () => {
   const { user, profile, signOut, isLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
+  const [showMascot, setShowMascot] = useState(false);
 
   // Handle scroll effect for navbar background
   useEffect(() => {
@@ -28,8 +30,15 @@ const Header = () => {
       setScrolled(window.scrollY > 20);
     };
     window.addEventListener("scroll", handleScroll);
+    
+    // Delay showing the mascot to avoid initial load issues
+    const timer = setTimeout(() => {
+      setShowMascot(true);
+    }, 1000);
+    
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -57,7 +66,13 @@ const Header = () => {
         <div className="flex items-center gap-2">
           <Link to="/" className="flex items-center gap-2">
             <div className="hidden sm:block">
-              <FiguroMascot size={40} />
+              {showMascot ? (
+                <Suspense fallback={<div className="w-10 h-10 bg-figuro-accent/20 rounded-full animate-pulse"></div>}>
+                  <FiguroMascot size={40} />
+                </Suspense>
+              ) : (
+                <div className="w-10 h-10 bg-figuro-accent/20 rounded-full"></div>
+              )}
             </div>
             <motion.div
               whileHover={{ rotate: 5 }}
@@ -115,7 +130,9 @@ const Header = () => {
                   <span>My Profile</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/profile/figurines")}>
-                  <FiguroMascot size={16} className="mr-2" />
+                  <div className="mr-2 h-4 w-4 flex items-center justify-center">
+                    <span className="text-xs font-bold">FG</span>
+                  </div>
                   <span>My Figurines</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/profile/pictures")}>
