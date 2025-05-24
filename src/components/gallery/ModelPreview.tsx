@@ -1,4 +1,3 @@
-
 import React, { Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Environment } from "@react-three/drei";
@@ -14,7 +13,6 @@ interface ModelPreviewProps {
   fileName: string;
 }
 
-// This component will render the actual 3D model
 const ModelContent = ({ 
   modelUrl, 
   isVisible 
@@ -22,14 +20,11 @@ const ModelContent = ({
   modelUrl: string; 
   isVisible: boolean 
 }) => {
-  // Create a stable ID based on the URL to prevent reloads
   const modelIdRef = useRef(`preview-${modelUrl.split('/').pop()?.split('?')[0]}-${Math.random().toString(36).substring(2, 9)}`);
   
-  // Clean URL from query parameters to prevent cache busting which causes reloads
   const cleanUrl = useMemo(() => {
     try {
       const url = new URL(modelUrl);
-      // Remove all cache-busting parameters
       ['t', 'cb', 'cache'].forEach(param => {
         if (url.searchParams.has(param)) {
           url.searchParams.delete(param);
@@ -37,7 +32,6 @@ const ModelContent = ({
       });
       return url.toString();
     } catch (e) {
-      // If URL parsing fails, return the original
       return modelUrl;
     }
   }, [modelUrl]);
@@ -46,7 +40,15 @@ const ModelContent = ({
     modelSource: cleanUrl,
     visible: isVisible,
     modelId: modelIdRef.current,
-    onError: (err) => console.error(`Error loading model ${cleanUrl}:`, err)
+    priority: isVisible ? 1 : 0,
+    maxRetries: 3,
+    onError: (err) => {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        console.log(`Model load aborted for ${cleanUrl}`);
+        return;
+      }
+      console.error(`Error loading model ${cleanUrl}:`, err);
+    }
   });
   
   if (loading) {
@@ -66,16 +68,14 @@ const ModelContent = ({
 const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
   const [hasError, setHasError] = useState(false);
   const { targetRef, isIntersecting, wasEverVisible } = useIntersectionObserver({
-    rootMargin: '200px', // Reduced from 300px to improve performance
+    rootMargin: '200px',
     threshold: 0.1,
-    once: true // Only observe once, then disconnect to prevent re-intersection triggers
+    once: true
   });
   
-  // Clean URL from query params for better caching
   const cleanModelUrl = useMemo(() => {
     try {
       const url = new URL(modelUrl);
-      // Remove all cache-busting parameters
       ['t', 'cb', 'cache'].forEach(param => {
         if (url.searchParams.has(param)) {
           url.searchParams.delete(param);
@@ -83,23 +83,22 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
       });
       return url.toString();
     } catch (e) {
-      // If URL parsing fails, return the original
       return modelUrl;
     }
   }, [modelUrl]);
   
-  // Handle errors silently by showing the placeholder
   const handleError = (error: any) => {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return;
+    }
     console.error(`ModelPreview error for ${fileName}:`, error);
     setHasError(true);
   };
 
-  // If there's an error, show the placeholder
   if (hasError) {
     return <ModelPlaceholder fileName={fileName} />;
   }
 
-  // Create unique ID for this preview canvas to avoid conflicts
   const canvasId = useRef(`canvas-${fileName.replace(/\W/g, '')}-${Math.random().toString(36).substring(2, 10)}`);
 
   return (
@@ -110,15 +109,15 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             id={canvasId.current}
             shadows 
             gl={{ 
-              powerPreference: "low-power", // Use low-power to save resources
-              antialias: false, // Disable for performance
+              powerPreference: "low-power",
+              antialias: false,
               depth: true,
               stencil: false,
               alpha: true
             }}
-            dpr={[0.8, 1]} // Further reduce resolution for better performance (was [1, 1.2])
-            style={{pointerEvents: "none"}} // Disable pointer events to prevent interaction in gallery view
-            frameloop="demand" // Only render when needed
+            dpr={[0.8, 1]}
+            style={{pointerEvents: "none"}}
+            frameloop="demand"
           >
             <color attach="background" args={['#1a1a1a']} />
             <ambientLight intensity={0.5} />
@@ -130,11 +129,11 @@ const ModelPreview: React.FC<ModelPreviewProps> = ({ modelUrl, fileName }) => {
             </Suspense>
             
             <OrbitControls 
-              autoRotate={isIntersecting} // Only auto-rotate when visible
-              autoRotateSpeed={1.5} // Reduced from 4 for better performance
+              autoRotate={isIntersecting}
+              autoRotateSpeed={1.5}
               enablePan={false}
               enableZoom={false}
-              enableRotate={false} // Disabled rotation for gallery view
+              enableRotate={false}
             />
             <Environment preset="sunset" />
           </Canvas>
