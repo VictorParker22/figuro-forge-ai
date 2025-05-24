@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
 import ImagePreview from "@/components/ImagePreview";
-import ModelViewer from "@/components/model-viewer";
+import EnhancedModelViewer from "@/components/model-viewer/EnhancedModelViewer";
 import Footer from "@/components/Footer";
 import ApiKeyInput from "@/components/ApiKeyInput";
 import StudioHeader from "@/components/StudioHeader";
@@ -48,7 +48,7 @@ const Studio = () => {
     conversionError
   } = useImageGeneration();
 
-  const { user: authUser, signOut } = useAuth();
+  const { user: authUser, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const { canPerformAction, trackAction } = useUsageTracking();
 
@@ -309,12 +309,16 @@ const Studio = () => {
                   </motion.div>
                   
                   <motion.div variants={item} className="h-full">
-                    <ModelViewer 
+                    <EnhancedModelViewer 
                       modelUrl={displayModelUrl} 
                       isLoading={isConverting}
                       progress={conversionProgress}
                       errorMessage={conversionError}
                       onCustomModelLoad={handleCustomModelLoad}
+                      title={customModelFile?.name || "Generated Figurine"}
+                      creatorName={profile?.full_name || authUser?.email?.split('@')[0] || "You"}
+                      creatorAvatar={profile?.avatar_url}
+                      createdAt={new Date().toISOString()}
                     />
                   </motion.div>
                 </motion.div>
