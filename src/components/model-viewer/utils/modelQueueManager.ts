@@ -1,4 +1,3 @@
-
 /**
  * Manager class to limit concurrent 3D model loading
  */
@@ -52,7 +51,7 @@ class ModelQueueManager {
           this.loadingCount--;
         }
         
-        // Process queue in case there are pending items with a delay
+        // Process queue in case there are pending items
         setTimeout(() => this.processQueue(), 200);
       } catch (error) {
         console.error(`Error aborting model load for ${modelId}:`, error);
@@ -68,7 +67,7 @@ class ModelQueueManager {
     loadFunction: () => Promise<T>
   ): Promise<T> {
     return new Promise((resolve, reject) => {
-      // If already loading this model, reject
+      // If already loading this model, reject immediately
       if (this.activeLoaders.has(modelId)) {
         reject(new Error(`Model ${modelId} is already being loaded`));
         return;
@@ -92,6 +91,12 @@ class ModelQueueManager {
           console.log(`[Queue] Loading model: ${modelId}, Active: ${this.loadingCount}/${this.maxConcurrent}`);
           
           const result = await loadFunction();
+          
+          // Double check the load wasn't aborted
+          if (controller.signal.aborted) {
+            throw new DOMException('Load operation aborted', 'AbortError');
+          }
+          
           resolve(result);
           return result;
         } catch (error) {
@@ -107,7 +112,7 @@ class ModelQueueManager {
           this.activeLoaders.delete(modelId);
           this.abortControllers.delete(modelId);
           
-          // Add a significant delay before processing the next item
+          // Add a delay before processing the next item
           this.lastProcessTime = Date.now();
           setTimeout(() => this.processQueue(), 500);
         }
