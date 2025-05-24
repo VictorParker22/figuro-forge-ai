@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
@@ -15,7 +14,7 @@ const ModelFooter = ({
   onDownload 
 }: ModelFooterProps) => {
   return (
-    <div className="p-4 flex justify-center">
+    <div className="p-4 flex justify-center bg-black/50">
       <Button
         className="w-full bg-figuro-accent hover:bg-figuro-accent-hover flex items-center gap-2"
         disabled={!displayModelUrl}
