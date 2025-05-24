@@ -1,13 +1,10 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 // Save image to storage and get public URL
 export const saveImageToStorage = async (imageBlob: Blob, figurineId: string): Promise<string | null> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    // Use anonymous storage path regardless of authentication status for simplicity
-    const filePath = `anonymous/${figurineId}.png`;
+    // Use a public storage path that doesn't require authentication
+    const filePath = `public/${figurineId}.png`;
     
     // Upload image to storage
     const { data, error } = await supabase.storage
