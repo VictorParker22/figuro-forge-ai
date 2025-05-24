@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, Share2 } from "lucide-react";
+import { Download, Share2, Image, Wand2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,7 +26,26 @@ const ImagePreview = ({
   const [imageError, setImageError] = useState<boolean>(false);
   
   if (!imageSrc && !isLoading) {
-    return null;
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="glass-panel rounded-xl overflow-hidden backdrop-blur-md border border-white/20 h-full min-h-[400px]"
+      >
+        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+          <h3 className="text-lg font-medium">Generated Image</h3>
+          <span className="text-xs px-2 py-1 rounded-full bg-figuro-accent/20 text-figuro-accent">Step 2</span>
+        </div>
+        <div className="relative aspect-square flex flex-col items-center justify-center p-8 text-center">
+          <div className="rounded-lg bg-white/5 border border-white/10 p-8 flex flex-col items-center justify-center w-full h-full">
+            <Image className="text-white/30 mb-4 w-16 h-16" />
+            <p className="text-white/50 mb-2">No image generated yet</p>
+            <p className="text-xs text-white/30">Complete Step 1 to generate your figurine image</p>
+          </div>
+        </div>
+      </motion.div>
+    );
   }
   
   const handleSaveImage = () => {
@@ -70,11 +89,12 @@ const ImagePreview = ({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="glass-panel rounded-xl overflow-hidden"
+      className="glass-panel rounded-xl overflow-hidden backdrop-blur-md border border-white/20 h-full"
     >
       <div className="p-4 border-b border-white/10 flex justify-between items-center">
         <h3 className="text-lg font-medium">Generated Image</h3>
         <div className="flex gap-2 items-center">
+          <span className="text-xs px-2 py-1 rounded-full bg-figuro-accent/20 text-figuro-accent">Step 2</span>
           {imageSrc && (
             <TooltipProvider>
               <Tooltip>
@@ -98,7 +118,7 @@ const ImagePreview = ({
             <Button 
               variant="outline" 
               size="sm"
-              className="border-white/10 hover:border-white/30"
+              className="border-white/20 hover:border-white/40 bg-white/5"
               onClick={handleSaveImage}
             >
               <Download size={16} className="mr-1" />
@@ -110,8 +130,14 @@ const ImagePreview = ({
       
       <div className="relative aspect-square">
         {isLoading ? (
-          <div className="w-full h-full p-4">
-            <Skeleton className="w-full h-full rounded-lg bg-white/5 loading-shine" />
+          <div className="w-full h-full p-4 flex flex-col items-center justify-center">
+            <div className="relative w-full h-full">
+              <Skeleton className="w-full h-full rounded-lg bg-white/5 loading-shine" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <Wand2 className="text-figuro-accent h-12 w-12 mb-4 animate-pulse" />
+                <p className="text-white/70">Generating your image...</p>
+              </div>
+            </div>
           </div>
         ) : (
           <motion.div
@@ -124,7 +150,7 @@ const ImagePreview = ({
               <img
                 src={imageSrc}
                 alt="Generated figurine"
-                className="w-full h-full object-contain rounded-lg"
+                className="w-full h-full object-contain rounded-lg shadow-lg"
                 onError={handleImageError}
               />
             ) : (
@@ -144,13 +170,23 @@ const ImagePreview = ({
         )}
       </div>
       
-      <div className="p-4 flex justify-center">
+      <div className="p-4">
         <Button
-          className="w-full bg-figuro-accent hover:bg-figuro-accent-hover"
+          className="w-full bg-figuro-accent hover:bg-figuro-accent-hover h-12 flex items-center justify-center gap-2 group"
           onClick={onConvertTo3D}
           disabled={!imageSrc || isConverting || isLoading || imageError}
         >
-          {isConverting ? "Converting..." : "Convert to 3D"}
+          {isConverting ? (
+            <>
+              <span className="mr-2">Converting...</span>
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            </>
+          ) : (
+            <>
+              <span className="transform group-hover:scale-105 transition-transform">Convert to 3D</span>
+              <Wand2 size={16} className="group-hover:rotate-12 transition-transform" />
+            </>
+          )}
         </Button>
       </div>
     </motion.div>

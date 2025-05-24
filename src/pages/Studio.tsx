@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PromptForm from "@/components/PromptForm";
@@ -17,6 +16,9 @@ import UploadModelModal from "@/components/UploadModelModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { useNavigate } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import VantaBackground from "@/components/VantaBackground";
+import { motion } from "framer-motion";
 
 const Studio = () => {
   const [apiKey, setApiKey] = useState<string | "">("");
@@ -26,6 +28,7 @@ const Studio = () => {
   const [customModelFile, setCustomModelFile] = useState<File | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("create");
   
   const {
     isGeneratingImage,
@@ -213,99 +216,159 @@ const Studio = () => {
   const displayModelUrl = customModelUrl || modelUrl;
   const displayModelFile = customModelFile;
 
-  return (
-    <div className="min-h-screen bg-figuro-dark">
-      <Header />
-      
-      <section className="pt-32 pb-24">
-        <div className="container mx-auto px-4">
-          <StudioHeader />
-          
-          <div className="mb-8 flex justify-between items-center">
-            <Button 
-              onClick={() => setUploadModalOpen(true)}
-              variant="outline" 
-              className="border-white/10 hover:border-white/30"
-            >
-              <Upload size={16} className="mr-2" />
-              Upload 3D Model
-            </Button>
-            
-            <div className="flex items-center gap-4">
-              {authUser ? (
-                <div className="flex items-center gap-4">
-                  <span className="text-white">Welcome, {authUser.email}</span>
-                  <Button onClick={handleSignOut} variant="outline" className="border-white/10">
-                    Sign Out
-                  </Button>
-                </div>
-              ) : (
-                <Button onClick={handleSignIn} variant="outline" className="border-white/10">
-                  Sign In to Save
-                </Button>
-              )}
-            </div>
-          </div>
-          
-          {showApiInput && (
-            <ApiKeyInput 
-              apiKey={apiKey}
-              setApiKey={(key) => {
-                setApiKey(key);
-                localStorage.setItem("tempHuggingFaceApiKey", key);
-              }}
-              onSubmit={() => setShowApiInput(false)}
-            />
-          )}
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div>
-              <PromptForm 
-                onGenerate={onGenerate} 
-                isGenerating={isGeneratingImage}
-              />
-            </div>
-            
-            <div>
-              <ImagePreview 
-                imageSrc={generatedImage} 
-                isLoading={isGeneratingImage}
-                onConvertTo3D={handleConvertWithUsageTracking}
-                isConverting={isConverting}
-                generationMethod={generationMethod}
-              />
-            </div>
-            
-            <div>
-              <ModelViewer 
-                modelUrl={displayModelUrl} 
-                isLoading={isConverting}
-                progress={conversionProgress}
-                errorMessage={conversionError}
-                onCustomModelLoad={handleCustomModelLoad}
-              />
-            </div>
-          </div>
-          
-          {authUser && (
-            <div className="mt-16">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gradient">Your Figurine Collection</h2>
-              </div>
-              <FigurineGallery />
-            </div>
-          )}
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.3
+      }
+    }
+  };
 
-          {/* Upload Model Modal */}
-          <UploadModelModal 
-            isOpen={uploadModalOpen}
-            onOpenChange={setUploadModalOpen}
-            onModelUpload={handleModelUpload}
-          />
-        </div>
-      </section>
-      
-      <Footer />
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
+  return (
+    <div className="min-h-screen bg-figuro-dark overflow-hidden relative">
+      <VantaBackground>
+        <Header />
+        
+        <section className="pt-20 pb-24">
+          <div className="container mx-auto px-4">
+            <StudioHeader />
+            
+            <motion.div 
+              className="mb-8 flex justify-between items-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Button 
+                onClick={() => setUploadModalOpen(true)}
+                variant="outline" 
+                className="border-white/20 hover:border-white/40 bg-white/5 backdrop-blur-sm"
+              >
+                <Upload size={16} className="mr-2" />
+                Upload 3D Model
+              </Button>
+              
+              <div className="flex items-center gap-4">
+                {authUser ? (
+                  <div className="flex items-center gap-4">
+                    <span className="text-white">Welcome, {authUser.email}</span>
+                    <Button onClick={handleSignOut} variant="outline" className="border-white/20 bg-white/5 backdrop-blur-sm">
+                      Sign Out
+                    </Button>
+                  </div>
+                ) : (
+                  <Button onClick={handleSignIn} variant="outline" className="border-white/20 bg-white/5 backdrop-blur-sm">
+                    Sign In to Save
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+            
+            {showApiInput && (
+              <ApiKeyInput 
+                apiKey={apiKey}
+                setApiKey={(key) => {
+                  setApiKey(key);
+                  localStorage.setItem("tempHuggingFaceApiKey", key);
+                }}
+                onSubmit={() => setShowApiInput(false)}
+              />
+            )}
+            
+            <Tabs 
+              defaultValue="create" 
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-full mb-8"
+            >
+              <TabsList className="grid grid-cols-2 w-[400px] mx-auto bg-white/10 backdrop-blur-sm">
+                <TabsTrigger value="create" className="data-[state=active]:text-white data-[state=active]:bg-figuro-accent">
+                  Create Model
+                </TabsTrigger>
+                <TabsTrigger value="gallery" className="data-[state=active]:text-white data-[state=active]:bg-figuro-accent">
+                  Your Gallery
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="create" className="mt-6">
+                <motion.div 
+                  className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+                  variants={container}
+                  initial="hidden"
+                  animate="show"
+                >
+                  <motion.div variants={item}>
+                    <PromptForm 
+                      onGenerate={onGenerate} 
+                      isGenerating={isGeneratingImage}
+                    />
+                  </motion.div>
+                  
+                  <motion.div variants={item}>
+                    <ImagePreview 
+                      imageSrc={generatedImage} 
+                      isLoading={isGeneratingImage}
+                      onConvertTo3D={handleConvertWithUsageTracking}
+                      isConverting={isConverting}
+                      generationMethod={generationMethod}
+                    />
+                  </motion.div>
+                  
+                  <motion.div variants={item}>
+                    <ModelViewer 
+                      modelUrl={displayModelUrl} 
+                      isLoading={isConverting}
+                      progress={conversionProgress}
+                      errorMessage={conversionError}
+                      onCustomModelLoad={handleCustomModelLoad}
+                    />
+                  </motion.div>
+                </motion.div>
+              </TabsContent>
+
+              <TabsContent value="gallery" className="mt-6">
+                {authUser ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-2xl font-semibold text-gradient">Your Figurine Collection</h2>
+                    </div>
+                    <FigurineGallery />
+                  </motion.div>
+                ) : (
+                  <div className="text-center py-16 glass-panel rounded-xl">
+                    <h2 className="text-2xl font-semibold text-gradient mb-4">Sign in to view your gallery</h2>
+                    <p className="text-white/70 mb-6">Create an account to save and manage your figurines</p>
+                    <Button onClick={handleSignIn} className="bg-figuro-accent hover:bg-figuro-accent-hover">
+                      Sign In / Sign Up
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        </section>
+        
+        <Footer />
+      </VantaBackground>
+
+      {/* Upload Model Modal */}
+      <UploadModelModal 
+        isOpen={uploadModalOpen}
+        onOpenChange={setUploadModalOpen}
+        onModelUpload={handleModelUpload}
+      />
     </div>
   );
 };

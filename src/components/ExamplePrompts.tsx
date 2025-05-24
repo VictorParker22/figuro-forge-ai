@@ -1,6 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { Lightbulb } from "lucide-react";
 
 type ExamplePrompt = {
   title: string;
@@ -40,18 +41,25 @@ const ExamplePrompts = ({ onSelectPrompt }: ExamplePromptsProps) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="glass-panel p-6 rounded-xl mt-6"
+      className="glass-panel p-6 rounded-xl mt-6 backdrop-blur-md border border-white/20"
     >
-      <h3 className="font-medium mb-3 text-white/80">Example Prompts</h3>
-      <div className="grid grid-cols-1 gap-2">
+      <div className="flex items-center gap-2 mb-4">
+        <Lightbulb size={16} className="text-yellow-300" />
+        <h3 className="font-medium text-white/80">Try These Ideas</h3>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {ISOMETRIC_EXAMPLES.map((example, index) => (
           <Button
             key={index}
             variant="outline"
             onClick={() => onSelectPrompt(example.prompt)}
-            className="justify-start bg-white/5 border-white/10 hover:bg-white/10 text-left"
+            className="justify-start bg-white/5 border-white/20 hover:bg-white/10 hover:border-figuro-accent/40 text-left transition-all group"
           >
-            <span className="truncate">{example.title} - {example.prompt}</span>
+            <div>
+              <span className="block text-figuro-accent font-medium group-hover:text-figuro-accent">{example.title}</span>
+              <span className="text-xs text-white/60 truncate block">{example.prompt}</span>
+            </div>
           </Button>
         ))}
       </div>

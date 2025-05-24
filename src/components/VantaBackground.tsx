@@ -25,38 +25,34 @@ const VantaBackground: React.FC<VantaBackgroundProps> = ({ children }) => {
     threeScript.async = true;
     document.body.appendChild(threeScript);
     
-    // Load p5.js (required for TRUNK effect)
+    // Load VANTA.NET after Three.js is loaded
     threeScript.onload = () => {
-      const p5Script = document.createElement('script');
-      p5Script.src = 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js';
-      p5Script.async = true;
-      document.body.appendChild(p5Script);
+      const vantaScript = document.createElement('script');
+      vantaScript.src = 'https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js';
+      vantaScript.async = true;
+      document.body.appendChild(vantaScript);
       
-      // Load VANTA.TRUNK after dependencies are loaded
-      p5Script.onload = () => {
-        const vantaScript = document.createElement('script');
-        vantaScript.src = 'https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.trunk.min.js';
-        vantaScript.async = true;
-        document.body.appendChild(vantaScript);
-        
-        // Initialize VANTA effect once the script is loaded
-        vantaScript.onload = () => {
-          if (!vantaEffect && vantaRef.current) {
-            const effect = window.VANTA.TRUNK({
-              el: vantaRef.current,
-              mouseControls: true,
-              touchControls: true,
-              gyroControls: false,
-              minHeight: 200.00,
-              minWidth: 200.00,
-              scale: 1.00,
-              scaleMobile: 1.00,
-              color: 0x7522c0,           // Purple color matching figuro-accent
-              backgroundColor: 0x09090f, // Dark background to match our theme
-            });
-            setVantaEffect(effect);
-          }
-        };
+      // Initialize VANTA effect once the script is loaded
+      vantaScript.onload = () => {
+        if (!vantaEffect && vantaRef.current) {
+          const effect = window.VANTA.NET({
+            el: vantaRef.current,
+            mouseControls: true,
+            touchControls: true,
+            gyroControls: false,
+            minHeight: 200.00,
+            minWidth: 200.00,
+            scale: 1.00,
+            scaleMobile: 1.00,
+            color: 0x9b87f5,           // Purple color matching figuro-accent
+            backgroundColor: 0x09090f,  // Dark background to match our theme
+            points: 8.00,
+            maxDistance: 25.00,
+            spacing: 18.00,
+            showDots: false
+          });
+          setVantaEffect(effect);
+        }
       };
     };
     
@@ -64,14 +60,14 @@ const VantaBackground: React.FC<VantaBackgroundProps> = ({ children }) => {
     return () => {
       if (vantaEffect) vantaEffect.destroy();
       // Remove scripts when component unmounts
-      const scripts = document.querySelectorAll('script[src*="vanta"], script[src*="three"], script[src*="p5"]');
-      scripts.forEach(script => script.remove());
+      document.querySelectorAll('script[src*="vanta"], script[src*="three"]')
+        .forEach(script => script.remove());
     };
   }, [vantaEffect]);
 
   return (
-    <div ref={vantaRef} className="absolute inset-0 z-0">
-      <div className="relative z-10">
+    <div ref={vantaRef} className="absolute inset-0 z-0 min-h-screen">
+      <div className="relative z-10 min-h-screen">
         {children}
       </div>
     </div>
