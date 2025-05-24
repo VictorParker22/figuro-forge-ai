@@ -5,8 +5,9 @@ export const saveImageToStorage = async (imageBlob: Blob, figurineId: string): P
   try {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // Use a path that works with RLS policies - public folder is typically allowed for all users
-    const filePath = `public/${figurineId}.png`;
+    // Use a path that works with RLS policies
+    // Instead of using 'public/' folder, use a more specific path
+    const filePath = `images/${figurineId}.png`;
     
     // Upload image to storage
     const { data, error } = await supabase.storage
